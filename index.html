@@ -183,6 +183,53 @@ input#nameInput:focus {
   color: #b3a2d1;
 }
 
+
+.print-btn {
+  width: 100%;
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(212,165,255,0.3);
+  background: rgba(255,255,255,0.06);
+  color: #e8ddf5;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.print-btn:active { transform: scale(0.98); }
+
+#printArea { display: none; }
+
+@media print {
+  body * { visibility: hidden; }
+  #printArea, #printArea * { visibility: visible; }
+  #printArea {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background: #fff;
+    color: #000;
+    padding: 20px;
+  }
+  #printArea h1 {
+    font-size: 1.4rem;
+    margin-bottom: 4px;
+  }
+  #printArea .print-item {
+    font-family: 'GJDEGD', sans-serif;
+    font-feature-settings: "liga" 1;
+    font-size: 2rem;
+    margin: 14px 0 2px;
+  }
+  #printArea .print-raw {
+    font-size: 0.85rem;
+    color: #555;
+    margin-bottom: 10px;
+  }
+}
+
 .hint {
   margin-top: 14px;
   font-size: 0.75rem;
@@ -365,8 +412,9 @@ input#nameInput:focus {
 </div>
 
 <div class="history">
-  <h2>Historique de tes noms <span class="clear" onclick="exportHistory()">exporter</span> &middot; <span class="clear" onclick="clearHistory()">tout effacer</span></h2>
+  <h2>Historique de tes noms <span class="clear" onclick="shareHistory()">partager</span> &middot; <span class="clear" onclick="exportHistory()">exporter</span> &middot; <span class="clear" onclick="clearHistory()">tout effacer</span></h2>
   <div id="historyList"></div>
+  <button class="print-btn" onclick="printHistory()">Imprimer mes noms</button>
 </div>
 
 <div class="alphabet">
@@ -483,6 +531,45 @@ drawBtn.addEventListener('click', () => {
   drawBtn._revealTimeout = setTimeout(() => revealEl.classList.remove('show'), 2200);
 });
 
+
+async function shareHistory() {
+  const list = loadHistory();
+  if (list.length === 0) {
+    alert('Aucun nom \u00e0 partager pour l\u2019instant.');
+    return;
+  }
+  let content = 'Mes noms Gyr J\u00f6rd Dreki (EGD)\n\n';
+  list.forEach(item => {
+    content += item.name + '   (' + item.date + ')\n';
+  });
+
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: 'Mes noms EGD', text: content });
+    } catch (e) {
+      // partage annule ou echoue, rien a faire
+    }
+  } else {
+    // repli si le partage natif n'est pas disponible
+    exportHistory();
+  }
+}
+
+function printHistory() {
+  const list = loadHistory();
+  const area = document.getElementById('printArea');
+  if (list.length === 0) {
+    alert('Aucun nom \u00e0 imprimer pour l\u2019instant.');
+    return;
+  }
+  let html = '<h1>Mes noms \u2014 Gyr J\u00f6rd Dreki</h1>';
+  list.forEach(item => {
+    html += `<div class="print-item">${toGlyphText(item.name)}</div><div class="print-raw">${item.name} \u2014 ${item.date}</div>`;
+  });
+  area.innerHTML = html;
+  window.print();
+}
+
 renderHistory();
   flashButton('.savebtn', 'Enregistré !');
 }
@@ -560,5 +647,6 @@ letters.forEach(l => {
 renderHistory();
 </script>
 
+<div id="printArea"></div>
 </body>
 </html>
