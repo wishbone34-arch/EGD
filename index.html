@@ -135,29 +135,52 @@ input#nameInput:focus {
   letter-spacing: 1px;
   margin-bottom: 8px;
 }
-.vowel-row {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 8px;
-}
-.vowel-btn {
-  background: #fff;
-  border: 1px solid rgba(212,165,255,0.35);
-  border-radius: 10px;
-  padding: 10px 2px;
+.pouch-btn {
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px dashed rgba(212,165,255,0.45);
+  background: rgba(124,77,255,0.10);
+  color: #e8ddf5;
+  font-size: 0.95rem;
+  font-weight: 600;
   cursor: pointer;
 }
-.vowel-btn span {
-  font-family: 'GJDEGD', sans-serif;
-  font-size: 1.6rem;
-  color: #16101f;
+.pouch-btn:active {
+  transform: scale(0.97);
+  background: rgba(124,77,255,0.22);
 }
-.vowel-btn:active {
-  transform: scale(0.94);
-  background: #f1e8ff;
+.pouch-icon {
+  font-size: 1.4rem;
+}
+.draw-reveal {
+  margin-top: 12px;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.draw-reveal.show {
+  opacity: 1;
+}
+.draw-reveal .reveal-glyph {
+  font-family: 'GJDEGD', sans-serif;
+  font-size: 2rem;
+  color: #fff;
+  background: rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 6px 16px;
+}
+.draw-reveal .reveal-text {
+  font-size: 0.75rem;
+  color: #b3a2d1;
 }
 
 .hint {
@@ -327,15 +350,12 @@ input#nameInput:focus {
   </div>
 
   <div class="vowel-section">
-    <div class="vowel-label">Insérer une voyelle particulière (au curseur)</div>
-    <div class="vowel-row">
-      <button type="button" class="vowel-btn" data-vowel=""><span></span></button>
-      <button type="button" class="vowel-btn" data-vowel=""><span></span></button>
-      <button type="button" class="vowel-btn" data-vowel=""><span></span></button>
-      <button type="button" class="vowel-btn" data-vowel=""><span></span></button>
-      <button type="button" class="vowel-btn" data-vowel=""><span></span></button>
-      <button type="button" class="vowel-btn" data-vowel=""><span></span></button>
-    </div>
+    <div class="vowel-label">Voyelle particulière</div>
+    <button type="button" id="drawVowelBtn" class="pouch-btn">
+      <span class="pouch-icon">🔮</span>
+      <span class="pouch-text">Piocher une voyelle</span>
+    </button>
+    <div id="drawReveal" class="draw-reveal"></div>
   </div>
 
   <div class="btnrow">
@@ -356,6 +376,16 @@ input#nameInput:focus {
 
 <script>
 const STORAGE_KEY = 'gjd_egd_noms_historique';
+
+
+const VOWEL_MARKERS = { '[1]': '\ue001', '[2]': '\ue002', '[3]': '\ue003', '[4]': '\ue004', '[5]': '\ue005', '[6]': '\ue006' };
+function toGlyphText(raw) {
+  let out = raw;
+  for (const [marker, glyph] of Object.entries(VOWEL_MARKERS)) {
+    out = out.split(marker).join(glyph);
+  }
+  return out;
+}
 
 const previewEl = document.getElementById('preview');
 const field = document.getElementById('nameInput');
@@ -386,7 +416,7 @@ field.addEventListener('input', () => {
     previewEl.style.fontSize = '';
     labelEl.textContent = '';
   } else {
-    previewEl.textContent = v;
+    previewEl.textContent = toGlyphText(v);
     previewEl.classList.remove('empty');
     requestAnimationFrame(fitPreview);
     labelEl.textContent = v;
@@ -428,19 +458,29 @@ function saveName() {
   list.unshift({ name: v, date: new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }) });
   persistHistory(list);
   
-document.querySelectorAll('.vowel-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const ch = btn.getAttribute('data-vowel');
-    const start = field.selectionStart ?? field.value.length;
-    const end = field.selectionEnd ?? field.value.length;
-    const before = field.value.slice(0, start);
-    const after = field.value.slice(end);
-    field.value = before + ch + after;
-    const newPos = start + ch.length;
-    field.focus();
-    field.setSelectionRange(newPos, newPos);
-    field.dispatchEvent(new Event('input'));
-  });
+const drawBtn = document.getElementById('drawVowelBtn');
+const revealEl = document.getElementById('drawReveal');
+const VOWEL_LIST = ['[1]', '[2]', '[3]', '[4]', '[5]', '[6]'];
+
+drawBtn.addEventListener('click', () => {
+  const idx = Math.floor(Math.random() * 6);
+  const marker = VOWEL_LIST[idx];
+  const glyph = toGlyphText(marker);
+
+  const start = field.selectionStart ?? field.value.length;
+  const end = field.selectionEnd ?? field.value.length;
+  const before = field.value.slice(0, start);
+  const after = field.value.slice(end);
+  field.value = before + marker + after;
+  const newPos = start + marker.length;
+  field.focus();
+  field.setSelectionRange(newPos, newPos);
+  field.dispatchEvent(new Event('input'));
+
+  revealEl.innerHTML = `<span class="reveal-glyph">${glyph}</span><span class="reveal-text">tir\u00e9e et plac\u00e9e</span>`;
+  revealEl.classList.add('show');
+  clearTimeout(drawBtn._revealTimeout);
+  drawBtn._revealTimeout = setTimeout(() => revealEl.classList.remove('show'), 2200);
 });
 
 renderHistory();
@@ -498,7 +538,7 @@ function renderHistory() {
     const div = document.createElement('div');
     div.className = 'hist-item';
     div.innerHTML = `
-      <span class="glyphtxt">${item.name}</span>
+      <span class="glyphtxt">${toGlyphText(item.name)}</span>
       <div class="meta">
         <span class="rawname">${item.name}</span>
         <span class="date">${item.date}</span>
