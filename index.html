@@ -550,13 +550,6 @@ function persistHistory(list) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
 }
 
-function saveName() {
-  const v = field.value.trim();
-  if (!v) return;
-  const list = loadHistory();
-  list.unshift({ name: v, date: new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }) });
-  persistHistory(list);
-  
 const drawBtn = document.getElementById('drawVowelBtn');
 const revealEl = document.getElementById('drawReveal');
 const cursorLeftBtn = document.getElementById('cursorLeft');
@@ -666,6 +659,14 @@ function printHistory() {
   window.print();
 }
 
+
+function saveName() {
+  const v = field.value.trim();
+  if (!v) return;
+  const list = loadHistory();
+  list.unshift({ name: v, date: new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }) });
+  persistHistory(list);
+  
 renderHistory();
   flashButton('.savebtn', 'Enregistré !');
 }
