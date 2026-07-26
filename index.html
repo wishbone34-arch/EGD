@@ -663,26 +663,75 @@ drawBtn.addEventListener('click', () => {
 renderCursorPreview();
 
 
+async function buildHistoryImageBlob(list) {
+  await document.fonts.ready;
+
+  const padding = 40;
+  const lineHeight = 90;
+  const glyphFontSize = 52;
+  const labelFontSize = 20;
+  const width = 900;
+  const height = padding * 2 + 70 + list.length * lineHeight;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.fillStyle = '#16101f';
+  ctx.font = '600 28px sans-serif';
+  ctx.fillText('Mes noms \u2014 Gyr J\u00f6rd Dreki (EGD)', padding, padding + 20);
+
+  let y = padding + 70;
+  list.forEach(item => {
+    ctx.font = glyphFontSize + 'px GJDEGD';
+    ctx.fillStyle = '#16101f';
+    ctx.fillText(toGlyphText(item.name), padding, y);
+
+    ctx.font = labelFontSize + 'px sans-serif';
+    ctx.fillStyle = '#888888';
+    ctx.fillText(item.name + '  \u2014  ' + item.date, padding, y + 32);
+
+    y += lineHeight;
+  });
+
+  return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+}
+
 async function shareHistory() {
   const list = loadHistory();
   if (list.length === 0) {
     alert('Aucun nom \u00e0 partager pour l\u2019instant.');
     return;
   }
-  let content = 'Mes noms Gyr J\u00f6rd Dreki (EGD)\n\n';
-  list.forEach(item => {
-    content += item.name + '   (' + item.date + ')\n';
-  });
 
-  if (navigator.share) {
+  const blob = await buildHistoryImageBlob(list);
+  const file = new File([blob], 'gjd_egd_noms.png', { type: 'image/png' });
+
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try {
-      await navigator.share({ title: 'Mes noms EGD', text: content });
+      await navigator.share({ title: 'Mes noms EGD', files: [file] });
     } catch (e) {
       // partage annule ou echoue, rien a faire
     }
+  } else if (navigator.share) {
+    // repli texte si le partage d'image n'est pas supporte sur cet appareil
+    let content = 'Mes noms Gyr J\u00f6rd Dreki (EGD)\n\n';
+    list.forEach(item => { content += item.name + '   (' + item.date + ')\n'; });
+    try { await navigator.share({ title: 'Mes noms EGD', text: content }); } catch (e) {}
   } else {
-    // repli si le partage natif n'est pas disponible
-    exportHistory();
+    // dernier repli : telecharger l'image directement
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'gjd_egd_noms.png';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 }
 
