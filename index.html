@@ -498,6 +498,10 @@ const STORAGE_KEY = 'gjd_egd_noms_historique';
 
 
 const VOWEL_MARKERS = { '[1]': '\ue001', '[2]': '\ue002', '[3]': '\ue003', '[4]': '\ue004', '[5]': '\ue005', '[6]': '\ue006' };
+function stripVowelMarkers(raw) {
+  return raw.replace(/\[[1-6]\]/g, '');
+}
+
 function toGlyphText(raw) {
   let out = raw;
   for (const [marker, glyph] of Object.entries(VOWEL_MARKERS)) {
@@ -538,7 +542,7 @@ field.addEventListener('input', () => {
     previewEl.textContent = toGlyphText(v);
     previewEl.classList.remove('empty');
     requestAnimationFrame(fitPreview);
-    labelEl.textContent = v;
+    labelEl.textContent = stripVowelMarkers(v);
   }
 });
 
@@ -650,7 +654,7 @@ drawBtn.addEventListener('click', () => {
     previewEl.textContent = toGlyphText(field.value);
     previewEl.classList.remove('empty');
     requestAnimationFrame(fitPreview);
-    labelEl.textContent = field.value;
+    labelEl.textContent = stripVowelMarkers(field.value);
   }
   renderCursorPreview();
 
@@ -693,7 +697,7 @@ async function buildHistoryImageBlob(list) {
 
     ctx.font = labelFontSize + 'px sans-serif';
     ctx.fillStyle = '#888888';
-    ctx.fillText(item.name + '  \u2014  ' + item.date, padding, y + 32);
+    ctx.fillText(stripVowelMarkers(item.name) + '  \u2014  ' + item.date, padding, y + 32);
 
     y += lineHeight;
   });
@@ -744,7 +748,7 @@ function printHistory() {
   }
   let html = '<h1>Mes noms \u2014 Gyr J\u00f6rd Dreki</h1>';
   list.forEach(item => {
-    html += `<div class="print-item">${toGlyphText(item.name)}</div><div class="print-raw">${item.name} \u2014 ${item.date}</div>`;
+    html += `<div class="print-item">${toGlyphText(item.name)}</div><div class="print-raw">${stripVowelMarkers(item.name)} \u2014 ${item.date}</div>`;
   });
   area.innerHTML = html;
   window.print();
@@ -779,7 +783,7 @@ function exportHistory() {
   content += 'Export\u00e9 le ' + new Date().toLocaleDateString('fr-FR') + '\n';
   content += '----------------------------------------\n\n';
   list.forEach(item => {
-    content += item.name + '   (enregistr\u00e9 le ' + item.date + ')\n';
+    content += stripVowelMarkers(item.name) + '   (enregistr\u00e9 le ' + item.date + ')\n';
   });
 
   const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
@@ -815,7 +819,7 @@ function renderHistory() {
     div.innerHTML = `
       <span class="glyphtxt">${toGlyphText(item.name)}</span>
       <div class="meta">
-        <span class="rawname">${item.name}</span>
+        <span class="rawname">${stripVowelMarkers(item.name)}</span>
         <span class="date">${item.date}</span>
       </div>
       <button class="del" onclick="deleteEntry(${idx})">✕</button>
