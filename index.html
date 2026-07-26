@@ -136,6 +136,25 @@ input#nameInput:focus {
   margin-bottom: 8px;
 }
 
+
+.lock-btn {
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(212,165,255,0.3);
+  background: rgba(255,255,255,0.05);
+  color: #b3a2d1;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.lock-btn.locked {
+  background: rgba(124,77,255,0.18);
+  border-color: rgba(212,165,255,0.5);
+  color: #e8ddf5;
+}
+.lock-btn:active { transform: scale(0.98); }
+
 .cursor-row {
   display: flex;
   align-items: center;
@@ -432,6 +451,7 @@ input#nameInput:focus {
 <div class="card">
   <label for="nameInput">Tape tes 7 lettres</label>
   <input id="nameInput" type="text" placeholder="Ex : Draconis" autocomplete="off" autocapitalize="off" spellcheck="false">
+  <button type="button" id="keyboardLockBtn" class="lock-btn">🔓 Clavier actif — appuyer pour verrouiller</button>
 
   <div class="preview-wrap">
     <div id="preview" class="empty">Ton nom en glyphes apparaîtra ici</div>
@@ -550,6 +570,23 @@ function persistHistory(list) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
 }
 
+const keyboardLockBtn = document.getElementById('keyboardLockBtn');
+let keyboardLocked = false;
+
+keyboardLockBtn.addEventListener('click', () => {
+  keyboardLocked = !keyboardLocked;
+  if (keyboardLocked) {
+    field.blur();
+    field.readOnly = true;
+    keyboardLockBtn.textContent = '\ud83d\udd12 Clavier verrouill\u00e9 \u2014 appuyer pour d\u00e9verrouiller';
+    keyboardLockBtn.classList.add('locked');
+  } else {
+    field.readOnly = false;
+    keyboardLockBtn.textContent = '\ud83d\udd13 Clavier actif \u2014 appuyer pour verrouiller';
+    keyboardLockBtn.classList.remove('locked');
+  }
+});
+
 const drawBtn = document.getElementById('drawVowelBtn');
 const revealEl = document.getElementById('drawReveal');
 const cursorLeftBtn = document.getElementById('cursorLeft');
@@ -584,16 +621,12 @@ function renderCursorPreview() {
 cursorLeftBtn.addEventListener('click', () => {
   cursorPos -= 1;
   clampCursor();
-  field.focus();
-  field.setSelectionRange(cursorPos, cursorPos);
   renderCursorPreview();
 });
 
 cursorRightBtn.addEventListener('click', () => {
   cursorPos += 1;
   clampCursor();
-  field.focus();
-  field.setSelectionRange(cursorPos, cursorPos);
   renderCursorPreview();
 });
 
@@ -607,9 +640,18 @@ drawBtn.addEventListener('click', () => {
   const after = field.value.slice(cursorPos);
   field.value = before + marker + after;
   cursorPos = cursorPos + marker.length;
-  field.focus();
-  field.setSelectionRange(cursorPos, cursorPos);
-  field.dispatchEvent(new Event('input'));
+  // pas de field.focus() ici : on evite volontairement de rouvrir le clavier
+  if (field.value.trim() === '') {
+    previewEl.textContent = 'Ton nom en glyphes apparaîtra ici';
+    previewEl.classList.add('empty');
+    previewEl.style.fontSize = '';
+    labelEl.textContent = '';
+  } else {
+    previewEl.textContent = toGlyphText(field.value);
+    previewEl.classList.remove('empty');
+    requestAnimationFrame(fitPreview);
+    labelEl.textContent = field.value;
+  }
   renderCursorPreview();
 
   revealEl.innerHTML = `<span class="reveal-glyph">${glyph}</span><span class="reveal-text">tir\u00e9e et plac\u00e9e</span>`;
