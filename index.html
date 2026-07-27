@@ -96,7 +96,7 @@ input#nameInput:focus {
   overflow-x: auto;
 }
 
-#preview {
+#preview, #glyphsPreview {
   font-family: 'GJDEGD', sans-serif;
   font-feature-settings: "liga" 1, "clig" 1;
   -webkit-font-feature-settings: "liga" 1, "clig" 1;
@@ -107,11 +107,21 @@ input#nameInput:focus {
   line-height: 1.15;
   max-width: 100%;
 }
-#preview.empty {
+#preview.empty, #glyphsPreview.empty {
   color: #c9c2d8;
   font-family: inherit;
   font-size: 1rem;
   letter-spacing: normal;
+}
+
+.section-title {
+  text-align: center;
+  font-size: 0.75rem;
+  color: #8a7aa8;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-top: 18px;
+  margin-bottom: -6px;
 }
 
 .preview-label {
@@ -447,12 +457,19 @@ input#nameInput:focus {
 
 <h1>Compositeur de Noms — EGD</h1>
 <div class="subtitle">Gyr Jörd Dreki · Police calligraphique des 32 Entés Gardiennes</div>
+<div style="text-align:center;font-size:0.65rem;color:#c9c2d8;margin-top:-6px;">VERSION-GLYPHES-SEULS-1</div>
 
 <div class="card">
   <label for="nameInput">Tape tes 7 lettres</label>
   <input id="nameInput" type="text" placeholder="Ex : Draconis" autocomplete="off" autocapitalize="off" spellcheck="false">
   <button type="button" id="keyboardLockBtn" class="lock-btn">🔓 Clavier actif — appuyer pour verrouiller</button>
 
+  <div class="section-title">Tes 7 glyphes (sans voyelles)</div>
+  <div class="preview-wrap">
+    <div id="glyphsPreview" class="empty">Tes 7 glyphes apparaîtront ici</div>
+  </div>
+
+  <div class="section-title">Nom formé (avec voyelles)</div>
   <div class="preview-wrap">
     <div id="preview" class="empty">Ton nom en glyphes apparaîtra ici</div>
   </div>
@@ -511,28 +528,47 @@ function toGlyphText(raw) {
 }
 
 const previewEl = document.getElementById('preview');
+const glyphsPreviewEl = document.getElementById('glyphsPreview');
 const field = document.getElementById('nameInput');
 
 const MAX_FONT_SIZE = 3.4; // rem
 const MIN_FONT_SIZE = 1.1; // rem
 
-function fitPreview() {
-  if (previewEl.classList.contains('empty')) return;
-  const wrap = previewEl.parentElement;
+function fitEl(el) {
+  if (el.classList.contains('empty')) return;
+  const wrap = el.parentElement;
   let size = MAX_FONT_SIZE;
-  previewEl.style.fontSize = size + 'rem';
+  el.style.fontSize = size + 'rem';
   let guard = 0;
-  while (previewEl.scrollWidth > wrap.clientWidth - 4 && size > MIN_FONT_SIZE && guard < 40) {
+  while (el.scrollWidth > wrap.clientWidth - 4 && size > MIN_FONT_SIZE && guard < 40) {
     size -= 0.1;
-    previewEl.style.fontSize = size + 'rem';
+    el.style.fontSize = size + 'rem';
     guard++;
   }
 }
 
+function fitPreview() {
+  fitEl(previewEl);
+  fitEl(glyphsPreviewEl);
+}
+
 const labelEl = document.getElementById('previewLabel');
 
-field.addEventListener('input', () => {
+function refreshPreviews() {
   const v = field.value;
+
+  // Tes 7 glyphes seuls : ligatures appliquées, mais aucune voyelle piochée
+  const glyphsOnly = stripVowelMarkers(v);
+  if (glyphsOnly.trim() === '') {
+    glyphsPreviewEl.textContent = 'Tes 7 glyphes apparaîtront ici';
+    glyphsPreviewEl.classList.add('empty');
+    glyphsPreviewEl.style.fontSize = '';
+  } else {
+    glyphsPreviewEl.textContent = glyphsOnly;
+    glyphsPreviewEl.classList.remove('empty');
+  }
+
+  // Nom formé : ligatures + voyelles piochées intégrées
   if (v.trim() === '') {
     previewEl.textContent = 'Ton nom en glyphes apparaîtra ici';
     previewEl.classList.add('empty');
@@ -541,10 +577,13 @@ field.addEventListener('input', () => {
   } else {
     previewEl.textContent = toGlyphText(v);
     previewEl.classList.remove('empty');
-    requestAnimationFrame(fitPreview);
     labelEl.textContent = stripVowelMarkers(v);
   }
-});
+
+  requestAnimationFrame(fitPreview);
+}
+
+field.addEventListener('input', refreshPreviews);
 
 window.addEventListener('resize', () => requestAnimationFrame(fitPreview));
 
@@ -645,17 +684,7 @@ drawBtn.addEventListener('click', () => {
   field.value = before + marker + after;
   cursorPos = cursorPos + marker.length;
   // pas de field.focus() ici : on evite volontairement de rouvrir le clavier
-  if (field.value.trim() === '') {
-    previewEl.textContent = 'Ton nom en glyphes apparaîtra ici';
-    previewEl.classList.add('empty');
-    previewEl.style.fontSize = '';
-    labelEl.textContent = '';
-  } else {
-    previewEl.textContent = toGlyphText(field.value);
-    previewEl.classList.remove('empty');
-    requestAnimationFrame(fitPreview);
-    labelEl.textContent = stripVowelMarkers(field.value);
-  }
+  refreshPreviews();
   renderCursorPreview();
 
   revealEl.innerHTML = `<span class="reveal-glyph">${glyph}</span><span class="reveal-text">tir\u00e9e et plac\u00e9e</span>`;
