@@ -8,6 +8,9 @@
 <meta name="theme-color" content="#0a0612">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap" rel="stylesheet">
 <style>
 @font-face {
   font-family: 'GJDEGD';
@@ -96,7 +99,7 @@ input#nameInput:focus {
   overflow-x: auto;
 }
 
-#preview, #glyphsPreview {
+#glyphsPreview {
   font-family: 'GJDEGD', sans-serif;
   font-feature-settings: "liga" 1, "clig" 1;
   -webkit-font-feature-settings: "liga" 1, "clig" 1;
@@ -107,11 +110,34 @@ input#nameInput:focus {
   line-height: 1.15;
   max-width: 100%;
 }
-#preview.empty, #glyphsPreview.empty {
+#glyphsPreview.empty {
   color: #c9c2d8;
   font-family: inherit;
   font-size: 1rem;
   letter-spacing: normal;
+}
+
+#preview {
+  font-family: 'Permanent Marker', cursive;
+  background: #16101f;
+  color: #ffffff;
+  padding: 16px 28px;
+  border-radius: 16px;
+  font-size: 2.3rem;
+  letter-spacing: 2px;
+  white-space: nowrap;
+  line-height: 1.2;
+  max-width: 100%;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+}
+#preview.empty {
+  color: #c9c2d8;
+  background: transparent;
+  box-shadow: none;
+  font-family: inherit;
+  font-size: 1rem;
+  letter-spacing: normal;
+  padding: 0;
 }
 
 .section-title {
@@ -457,7 +483,7 @@ input#nameInput:focus {
 
 <h1>Compositeur de Noms — EGD</h1>
 <div class="subtitle">Gyr Jörd Dreki · Police calligraphique des 32 Entés Gardiennes</div>
-<div style="text-align:center;font-size:0.65rem;color:#c9c2d8;margin-top:-6px;">VERSION-VOYELLES-SYMBOLES-4</div>
+<div style="text-align:center;font-size:0.65rem;color:#c9c2d8;margin-top:-6px;">VERSION-BADGE-MANUSCRIT-5</div>
 
 <div class="card">
   <label for="nameInput">Tape tes 7 lettres</label>
@@ -471,7 +497,7 @@ input#nameInput:focus {
 
   <div class="section-title">Nom formé (avec voyelles)</div>
   <div class="preview-wrap">
-    <div id="preview" class="empty">Ton nom en glyphes apparaîtra ici</div>
+    <div id="preview" class="empty">Ton nom formé apparaîtra ici</div>
   </div>
   <div id="previewLabel" class="preview-label"></div>
 
@@ -581,12 +607,12 @@ function refreshPreviews() {
 
   // Nom formé : ligatures + voyelles piochées intégrées
   if (v.trim() === '') {
-    previewEl.textContent = 'Ton nom en glyphes apparaîtra ici';
+    previewEl.textContent = 'Ton nom formé apparaîtra ici';
     previewEl.classList.add('empty');
     previewEl.style.fontSize = '';
     labelEl.textContent = '';
   } else {
-    previewEl.textContent = toGlyphText(v);
+    previewEl.textContent = toReadableName(v);
     previewEl.classList.remove('empty');
     labelEl.textContent = toReadableName(v);
   }
