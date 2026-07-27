@@ -500,7 +500,7 @@ input#nameInput:focus {
 
 <h1>Compositeur de Noms — EGD</h1>
 <div class="subtitle">Gyr Jörd Dreki · Police calligraphique des 32 Entés Gardiennes</div>
-<div style="text-align:center;font-size:0.65rem;color:#c9c2d8;margin-top:-6px;">VERSION-NOMFORME-COMPACT-12</div>
+<div style="text-align:center;font-size:0.65rem;color:#c9c2d8;margin-top:-6px;">VERSION-GRIS-FONCE-13</div>
 
 <div class="card">
   <label for="nameInput">Tape tes 7 lettres</label>
@@ -809,7 +809,7 @@ async function buildHistoryImageBlob(list) {
     ctx.fillText(consonantGlyphText(item.name), padding, y);
 
     ctx.font = labelFontSize + 'px sans-serif';
-    ctx.fillStyle = '#888888';
+    ctx.fillStyle = '#555555';
     ctx.fillText(toReadableName(item.name) + '  \u2014  ' + item.date, padding, y + 32);
 
     y += lineHeight;
