@@ -125,7 +125,7 @@ input#nameInput:focus {
   padding: 0;
   border-radius: 0;
   font-size: 1.35rem;
-  letter-spacing: 2px;
+  letter-spacing: 0.5px;
   white-space: nowrap;
   line-height: 1.2;
   display: inline-block;
@@ -500,7 +500,7 @@ input#nameInput:focus {
 
 <h1>Compositeur de Noms — EGD</h1>
 <div class="subtitle">Gyr Jörd Dreki · Police calligraphique des 32 Entés Gardiennes</div>
-<div style="text-align:center;font-size:0.65rem;color:#c9c2d8;margin-top:-6px;">VERSION-ANTIFUSION-11</div>
+<div style="text-align:center;font-size:0.65rem;color:#c9c2d8;margin-top:-6px;">VERSION-NOMFORME-COMPACT-12</div>
 
 <div class="card">
   <label for="nameInput">Tape tes 7 lettres</label>
@@ -598,24 +598,26 @@ const glyphsPreviewEl = document.getElementById('glyphsPreview');
 const field = document.getElementById('nameInput');
 
 const MAX_FONT_SIZE = 3.4; // rem
-const MIN_FONT_SIZE = 1.1; // rem
+const MIN_FONT_SIZE = 1.1; // rem — plancher pour "tes 7 glyphes" (doivent rester lisibles)
+const MIN_FONT_SIZE_NAME = 0.5; // rem — plancher plus bas pour "nom formé", du texte simple qui peut rétrécir davantage
+const MAX_FONT_SIZE_NAME = 2.3; // rem
 
-function fitEl(el) {
+function fitEl(el, minSize) {
   if (el.classList.contains('empty')) return;
   const wrap = el.parentElement;
-  let size = MAX_FONT_SIZE;
+  let size = el === previewEl ? MAX_FONT_SIZE_NAME : MAX_FONT_SIZE;
   el.style.fontSize = size + 'rem';
   let guard = 0;
-  while (el.scrollWidth > wrap.clientWidth - 4 && size > MIN_FONT_SIZE && guard < 40) {
-    size -= 0.1;
+  while (el.scrollWidth > wrap.clientWidth - 4 && size > minSize && guard < 60) {
+    size -= 0.05;
     el.style.fontSize = size + 'rem';
     guard++;
   }
 }
 
 function fitPreview() {
-  fitEl(previewEl);
-  fitEl(glyphsPreviewEl);
+  fitEl(previewEl, MIN_FONT_SIZE_NAME);
+  fitEl(glyphsPreviewEl, MIN_FONT_SIZE);
 }
 
 const labelEl = document.getElementById('previewLabel');
