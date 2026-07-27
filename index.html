@@ -457,7 +457,7 @@ input#nameInput:focus {
 
 <h1>Compositeur de Noms — EGD</h1>
 <div class="subtitle">Gyr Jörd Dreki · Police calligraphique des 32 Entés Gardiennes</div>
-<div style="text-align:center;font-size:0.65rem;color:#c9c2d8;margin-top:-6px;">VERSION-GLYPHES-SEULS-1</div>
+<div style="text-align:center;font-size:0.65rem;color:#c9c2d8;margin-top:-6px;">VERSION-VOYELLES-VISIBLES-2</div>
 
 <div class="card">
   <label for="nameInput">Tape tes 7 lettres</label>
@@ -577,7 +577,7 @@ function refreshPreviews() {
   } else {
     previewEl.textContent = toGlyphText(v);
     previewEl.classList.remove('empty');
-    labelEl.textContent = stripVowelMarkers(v);
+    labelEl.textContent = v;
   }
 
   requestAnimationFrame(fitPreview);
@@ -726,7 +726,7 @@ async function buildHistoryImageBlob(list) {
 
     ctx.font = labelFontSize + 'px sans-serif';
     ctx.fillStyle = '#888888';
-    ctx.fillText(stripVowelMarkers(item.name) + '  \u2014  ' + item.date, padding, y + 32);
+    ctx.fillText(item.name + '  \u2014  ' + item.date, padding, y + 32);
 
     y += lineHeight;
   });
@@ -777,7 +777,7 @@ function printHistory() {
   }
   let html = '<h1>Mes noms \u2014 Gyr J\u00f6rd Dreki</h1>';
   list.forEach(item => {
-    html += `<div class="print-item">${toGlyphText(item.name)}</div><div class="print-raw">${stripVowelMarkers(item.name)} \u2014 ${item.date}</div>`;
+    html += `<div class="print-item">${toGlyphText(item.name)}</div><div class="print-raw">${item.name} \u2014 ${item.date}</div>`;
   });
   area.innerHTML = html;
   window.print();
@@ -812,7 +812,7 @@ function exportHistory() {
   content += 'Export\u00e9 le ' + new Date().toLocaleDateString('fr-FR') + '\n';
   content += '----------------------------------------\n\n';
   list.forEach(item => {
-    content += stripVowelMarkers(item.name) + '   (enregistr\u00e9 le ' + item.date + ')\n';
+    content += item.name + '   (enregistr\u00e9 le ' + item.date + ')\n';
   });
 
   const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
@@ -848,7 +848,7 @@ function renderHistory() {
     div.innerHTML = `
       <span class="glyphtxt">${toGlyphText(item.name)}</span>
       <div class="meta">
-        <span class="rawname">${stripVowelMarkers(item.name)}</span>
+        <span class="rawname">${item.name}</span>
         <span class="date">${item.date}</span>
       </div>
       <button class="del" onclick="deleteEntry(${idx})">✕</button>
