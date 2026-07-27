@@ -457,7 +457,7 @@ input#nameInput:focus {
 
 <h1>Compositeur de Noms — EGD</h1>
 <div class="subtitle">Gyr Jörd Dreki · Police calligraphique des 32 Entés Gardiennes</div>
-<div style="text-align:center;font-size:0.65rem;color:#c9c2d8;margin-top:-6px;">VERSION-VOYELLES-VISIBLES-2</div>
+<div style="text-align:center;font-size:0.65rem;color:#c9c2d8;margin-top:-6px;">VERSION-VOYELLES-LETTRES-3</div>
 
 <div class="card">
   <label for="nameInput">Tape tes 7 lettres</label>
@@ -515,8 +515,16 @@ const STORAGE_KEY = 'gjd_egd_noms_historique';
 
 
 const VOWEL_MARKERS = { '[1]': '\ue001', '[2]': '\ue002', '[3]': '\ue003', '[4]': '\ue004', '[5]': '\ue005', '[6]': '\ue006' };
+const VOWEL_LETTERS = { '[1]': 'Y', '[2]': 'A', '[3]': 'U', '[4]': 'O', '[5]': 'E', '[6]': 'I' };
 function stripVowelMarkers(raw) {
   return raw.replace(/\[[1-6]\]/g, '');
+}
+function toReadableName(raw) {
+  let out = raw.toUpperCase();
+  for (const [marker, letter] of Object.entries(VOWEL_LETTERS)) {
+    out = out.split(marker).join(letter);
+  }
+  return out;
 }
 
 function toGlyphText(raw) {
@@ -577,7 +585,7 @@ function refreshPreviews() {
   } else {
     previewEl.textContent = toGlyphText(v);
     previewEl.classList.remove('empty');
-    labelEl.textContent = v;
+    labelEl.textContent = toReadableName(v);
   }
 
   requestAnimationFrame(fitPreview);
@@ -726,7 +734,7 @@ async function buildHistoryImageBlob(list) {
 
     ctx.font = labelFontSize + 'px sans-serif';
     ctx.fillStyle = '#888888';
-    ctx.fillText(item.name + '  \u2014  ' + item.date, padding, y + 32);
+    ctx.fillText(toReadableName(item.name) + '  \u2014  ' + item.date, padding, y + 32);
 
     y += lineHeight;
   });
@@ -753,7 +761,7 @@ async function shareHistory() {
   } else if (navigator.share) {
     // repli texte si le partage d'image n'est pas supporte sur cet appareil
     let content = 'Mes noms Gyr J\u00f6rd Dreki (EGD)\n\n';
-    list.forEach(item => { content += item.name + '   (' + item.date + ')\n'; });
+    list.forEach(item => { content += toReadableName(item.name) + '   (' + item.date + ')\n'; });
     try { await navigator.share({ title: 'Mes noms EGD', text: content }); } catch (e) {}
   } else {
     // dernier repli : telecharger l'image directement
@@ -777,7 +785,7 @@ function printHistory() {
   }
   let html = '<h1>Mes noms \u2014 Gyr J\u00f6rd Dreki</h1>';
   list.forEach(item => {
-    html += `<div class="print-item">${toGlyphText(item.name)}</div><div class="print-raw">${item.name} \u2014 ${item.date}</div>`;
+    html += `<div class="print-item">${toGlyphText(item.name)}</div><div class="print-raw">${toReadableName(item.name)} \u2014 ${item.date}</div>`;
   });
   area.innerHTML = html;
   window.print();
@@ -812,7 +820,7 @@ function exportHistory() {
   content += 'Export\u00e9 le ' + new Date().toLocaleDateString('fr-FR') + '\n';
   content += '----------------------------------------\n\n';
   list.forEach(item => {
-    content += item.name + '   (enregistr\u00e9 le ' + item.date + ')\n';
+    content += toReadableName(item.name) + '   (enregistr\u00e9 le ' + item.date + ')\n';
   });
 
   const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
@@ -848,7 +856,7 @@ function renderHistory() {
     div.innerHTML = `
       <span class="glyphtxt">${toGlyphText(item.name)}</span>
       <div class="meta">
-        <span class="rawname">${item.name}</span>
+        <span class="rawname">${toReadableName(item.name)}</span>
         <span class="date">${item.date}</span>
       </div>
       <button class="del" onclick="deleteEntry(${idx})">✕</button>
