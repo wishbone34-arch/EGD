@@ -457,7 +457,7 @@ input#nameInput:focus {
 
 <h1>Compositeur de Noms — EGD</h1>
 <div class="subtitle">Gyr Jörd Dreki · Police calligraphique des 32 Entés Gardiennes</div>
-<div style="text-align:center;font-size:0.65rem;color:#c9c2d8;margin-top:-6px;">VERSION-VOYELLES-LETTRES-3</div>
+<div style="text-align:center;font-size:0.65rem;color:#c9c2d8;margin-top:-6px;">VERSION-VOYELLES-SYMBOLES-4</div>
 
 <div class="card">
   <label for="nameInput">Tape tes 7 lettres</label>
@@ -515,7 +515,7 @@ const STORAGE_KEY = 'gjd_egd_noms_historique';
 
 
 const VOWEL_MARKERS = { '[1]': '\ue001', '[2]': '\ue002', '[3]': '\ue003', '[4]': '\ue004', '[5]': '\ue005', '[6]': '\ue006' };
-const VOWEL_LETTERS = { '[1]': 'Y', '[2]': 'A', '[3]': 'U', '[4]': 'O', '[5]': 'E', '[6]': 'I' };
+const VOWEL_LETTERS = { '[1]': '\u024e', '[2]': '\u023a', '[3]': '\u0168', '[4]': '\u00d8', '[5]': '\u018e', '[6]': '\u0197' };
 function stripVowelMarkers(raw) {
   return raw.replace(/\[[1-6]\]/g, '');
 }
@@ -525,6 +525,9 @@ function toReadableName(raw) {
     out = out.split(marker).join(letter);
   }
   return out;
+}
+function consonantGlyphText(raw) {
+  return toGlyphText(stripVowelMarkers(raw));
 }
 
 function toGlyphText(raw) {
@@ -730,7 +733,7 @@ async function buildHistoryImageBlob(list) {
   list.forEach(item => {
     ctx.font = glyphFontSize + 'px GJDEGD';
     ctx.fillStyle = '#16101f';
-    ctx.fillText(toGlyphText(item.name), padding, y);
+    ctx.fillText(consonantGlyphText(item.name), padding, y);
 
     ctx.font = labelFontSize + 'px sans-serif';
     ctx.fillStyle = '#888888';
@@ -785,7 +788,7 @@ function printHistory() {
   }
   let html = '<h1>Mes noms \u2014 Gyr J\u00f6rd Dreki</h1>';
   list.forEach(item => {
-    html += `<div class="print-item">${toGlyphText(item.name)}</div><div class="print-raw">${toReadableName(item.name)} \u2014 ${item.date}</div>`;
+    html += `<div class="print-item">${consonantGlyphText(item.name)}</div><div class="print-raw">${toReadableName(item.name)} \u2014 ${item.date}</div>`;
   });
   area.innerHTML = html;
   window.print();
@@ -854,7 +857,7 @@ function renderHistory() {
     const div = document.createElement('div');
     div.className = 'hist-item';
     div.innerHTML = `
-      <span class="glyphtxt">${toGlyphText(item.name)}</span>
+      <span class="glyphtxt">${consonantGlyphText(item.name)}</span>
       <div class="meta">
         <span class="rawname">${toReadableName(item.name)}</span>
         <span class="date">${item.date}</span>
