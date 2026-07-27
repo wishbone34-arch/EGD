@@ -8,9 +8,6 @@
 <meta name="theme-color" content="#0a0612">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap" rel="stylesheet">
 <style>
 @font-face {
   font-family: 'GJDEGD';
@@ -118,7 +115,8 @@ input#nameInput:focus {
 }
 
 #preview {
-  font-family: 'Permanent Marker', cursive;
+  font-family: Arial, Helvetica, sans-serif;
+  font-weight: 600;
   background: #16101f;
   color: #ffffff;
   padding: 16px 28px;
@@ -127,7 +125,11 @@ input#nameInput:focus {
   letter-spacing: 2px;
   white-space: nowrap;
   line-height: 1.2;
+  display: inline-block;
   max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
   box-shadow: 0 4px 14px rgba(0,0,0,0.25);
 }
 #preview.empty {
@@ -483,7 +485,7 @@ input#nameInput:focus {
 
 <h1>Compositeur de Noms — EGD</h1>
 <div class="subtitle">Gyr Jörd Dreki · Police calligraphique des 32 Entés Gardiennes</div>
-<div style="text-align:center;font-size:0.65rem;color:#c9c2d8;margin-top:-6px;">VERSION-BADGE-MANUSCRIT-5</div>
+<div style="text-align:center;font-size:0.65rem;color:#c9c2d8;margin-top:-6px;">VERSION-BADGE-SEMIBOLD-8</div>
 
 <div class="card">
   <label for="nameInput">Tape tes 7 lettres</label>
