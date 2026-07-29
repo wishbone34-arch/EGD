@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Fréquences Sacrées — Bibliothèque</title>
+<script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; height: 100%;
+    background: #0a0612;
+    color: #e8ddf5;
+    font-family: -apple-system, system-ui, sans-serif;
+  }
+  body { display: flex; flex-direction: column; }
+  header {
+    padding: 18px 16px 10px;
+    background: linear-gradient(180deg, #241a38 0%, #0a0612 100%);
+  }
+  h1 {
+    font-size: 1.3rem;
+    background: linear-gradient(90deg, #d4a5ff, #ffe9c7);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    margin: 0 0 10px;
+  }
+  #searchInput {
+    width: 100%; padding: 12px 14px; border-radius: 12px; border: none;
+    background: rgba(255,255,255,0.08); color: #e8ddf5; font-size: 0.95rem;
+  }
+  #searchInput::placeholder { color: #8a7aa8; }
+  .tabs {
+    display: flex; gap: 8px; overflow-x: auto; padding: 12px 16px 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .tab {
+    flex-shrink: 0; padding: 7px 14px; border-radius: 999px;
+    background: rgba(124,77,255,0.1); border: 1px solid rgba(212,165,255,0.25);
+    color: #b3a2d1; font-size: 0.82rem; white-space: nowrap; cursor: pointer;
+  }
+  .tab.active { background: #7c4dff; color: #16101f; font-weight: 700; border-color: #7c4dff; }
+  main { flex: 1; overflow-y: auto; padding: 8px 16px 130px; }
+  .track {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 10px; border-radius: 12px; margin-bottom: 6px;
+    background: rgba(124,77,255,0.05);
+  }
+  .track.playing { background: rgba(124,77,255,0.22); }
+  .track-icon {
+    font-size: 1.3rem; width: 34px; text-align: center; flex-shrink: 0;
+    background: linear-gradient(135deg, #d4a5ff, #ffe9c7);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    font-weight: 700;
+  }
+  .track-info { flex: 1; min-width: 0; }
+  .track-name { font-size: 0.95rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .track-meta { font-size: 0.75rem; color: #8a7aa8; margin-top: 2px; }
+  .track-action {
+    flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,0.08); border: none; color: #e8ddf5; font-size: 1.1rem;
+  }
+  .track-action.ready { background: #7c4dff; }
+  .track-action.busy { background: rgba(212,165,255,0.2); font-size: 0.7rem; }
+  .empty-msg { text-align: center; color: #7a6a96; padding: 40px 20px; font-size: 0.9rem; }
+
+  #player {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: #151022; border-top: 1px solid rgba(212,165,255,0.2);
+    padding: 10px 16px 18px; display: none;
+  }
+  #player.show { display: block; }
+  .player-track { font-size: 0.88rem; font-weight: 700; margin-bottom: 2px; }
+  .player-sub { font-size: 0.72rem; color: #8a7aa8; margin-bottom: 10px; }
+  .player-controls {
+    display: flex; align-items: center; justify-content: center; gap: 22px;
+  }
+  .player-btn { background: none; border: none; color: #e8ddf5; font-size: 1.3rem; }
+  .player-btn.main {
+    width: 48px; height: 48px; border-radius: 50%; background: #7c4dff;
+    display: flex; align-items: center; justify-content: center; font-size: 1.3rem;
+  }
+  .player-btn.toggled { color: #d4a5ff; }
+  .genrow {
+    display: flex; align-items: center; gap: 10px; padding: 10px 4px;
+  }
+  .genrow input[type=range] { flex: 1; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Fréquences Sacrées</h1>
+  <input type="text" id="searchInput" placeholder="Rechercher un morceau...">
+  <div class="tabs" id="tabs"></div>
+</header>
+
+<main id="trackList"></main>
+
+<div id="player">
+  <div class="player-track" id="playerTrackName">—</div>
+  <div class="player-sub" id="playerTrackMeta">—</div>
+  <div class="player-controls">
+    <button class="player-btn" id="shuffleBtn" title="Lecture aléatoire">🔀</button>
+    <button class="player-btn" id="prevBtn">⏮</button>
+    <button class="player-btn main" id="playPauseBtn">▶</button>
+    <button class="player-btn" id="nextBtn">⏭</button>
+    <button class="player-btn" id="loopBtn" title="Répéter">🔁</button>
+  </div>
+</div>
+
+<audio id="audioEl"></audio>
+
+<script>
+// ===== Catalogue de compositions =====
+const PRESETS = [
+  { id: 'sommeil-01', name: 'Abandon immobile', category: 'Sommeil', icon: '☾', theme: 174, voices: ['drone'], duration: 15 },
+  { id: 'sommeil-02', name: 'Repos léger', category: 'Sommeil', icon: '☾', theme: 171, voices: ['drone'], duration: 15 },
+  { id: 'sommeil-03', name: 'Cocon nocturne', category: 'Sommeil', icon: '☾', theme: 174, voices: ['drone'], duration: 15 },
+  { id: 'sommeil-04', name: 'Halo Lunaire silencieux', category: 'Sommeil', icon: '☾', theme: 171, voices: ['drone'], duration: 25 },
+  { id: 'sommeil-05', name: 'Songe nocturne', category: 'Sommeil', icon: '☾', theme: 174, voices: ['drone'], duration: 25 },
+  { id: 'sommeil-06', name: 'Silence voilé', category: 'Sommeil', icon: '☾', theme: 174, voices: ['drone'], duration: 30 },
+  { id: 'sommeil-07', name: 'Ombre du Soir tranquille', category: 'Sommeil', icon: '☾', theme: 180, voices: ['drone'], duration: 30 },
+  { id: 'sommeil-08', name: 'Sommeil silencieux', category: 'Sommeil', icon: '☾', theme: 174, voices: ['drone'], duration: 30 },
+  { id: 'sommeil-09', name: 'Refuge Nocturne silencieux', category: 'Sommeil', icon: '☾', theme: 174, voices: ['drone'], duration: 20 },
+  { id: 'sommeil-10', name: 'Nid lunaire', category: 'Sommeil', icon: '☾', theme: 168, voices: ['drone'], duration: 25 },
+  { id: 'sommeil-11', name: 'Brume Nocturne légère', category: 'Sommeil', icon: '☾', theme: 174, voices: ['drone'], duration: 30 },
+  { id: 'sommeil-12', name: 'Abandon lunaire', category: 'Sommeil', icon: '☾', theme: 174, voices: ['drone'], duration: 20 },
+  { id: 'sommeil-13', name: 'Songe apaisant', category: 'Sommeil', icon: '☾', theme: 174, voices: ['drone'], duration: 20 },
+  { id: 'sommeil-14', name: 'Refuge Nocturne doux', category: 'Sommeil', icon: '☾', theme: 174, voices: ['drone'], duration: 25 },
+  { id: 'sommeil-15', name: 'Sommeil apaisant', category: 'Sommeil', icon: '☾', theme: 174, voices: ['drone'], duration: 15 },
+  { id: 'sommeil-16', name: 'Berceau lunaire', category: 'Sommeil', icon: '☾', theme: 174, voices: ['drone'], duration: 20 },
+  { id: 'sommeil-17', name: 'Nuit Douce lunaire', category: 'Sommeil', icon: '☾', theme: 174, voices: ['drone'], duration: 15 },
+  { id: 'sommeil-18', name: 'Rêverie profonde', category: 'Sommeil', icon: '☾', theme: 174, voices: ['drone'], duration: 20 },
+  { id: 'sommeil-19', name: 'Sommeil paisible', category: 'Sommeil', icon: '☾', theme: 174, voices: ['drone'], duration: 20 },
+  { id: 'sommeil-20', name: 'Ombre du Soir profonde', category: 'Sommeil', icon: '☾', theme: 174, voices: ['drone'], duration: 20 },
+  { id: 'sommeil-21', name: 'Berceau doux', category: 'Sommeil', icon: '☾', theme: 174, voices: ['drone'], duration: 25 },
+  { id: 'sommeil-22', name: 'Berceau immobile', category: 'Sommeil', icon: '☾', theme: 174, voices: ['drone'], duration: 20 },
+  { id: 'sommeil-23', name: 'Brume Nocturne apaisante', category: 'Sommeil', icon: '☾', theme: 174, voices: ['drone'], duration: 25 },
+  { id: 'sommeil-24', name: 'Voile de Nuit paisible', category: 'Sommeil', icon: '☾', theme: 174, voices: ['drone'], duration: 20 },
+  { id: 'sommeil-25', name: 'Cocon léger', category: 'Sommeil', icon: '☾', theme: 174, voices: ['drone'], duration: 25 },
+  { id: 'meditation-01', name: 'Vide Fécond intérieur', category: 'Méditation', icon: '◎', theme: 432, voices: ['drone','flute'], duration: 15 },
+  { id: 'meditation-02', name: 'Assise fluide', category: 'Méditation', icon: '◎', theme: 432, voices: ['drone','flute'], duration: 30 },
+  { id: 'meditation-03', name: 'Assise claire', category: 'Méditation', icon: '◎', theme: 432, voices: ['drone','flute'], duration: 25 },
+  { id: 'meditation-04', name: 'Éveil Doux présent', category: 'Méditation', icon: '◎', theme: 432, voices: ['drone','flute'], duration: 20 },
+  { id: 'meditation-05', name: 'Instant présent', category: 'Méditation', icon: '◎', theme: 432, voices: ['drone','flute'], duration: 15 },
+  { id: 'meditation-06', name: 'Vacuité suspendue', category: 'Méditation', icon: '◎', theme: 438, voices: ['drone','flute'], duration: 20 },
+  { id: 'meditation-07', name: 'Silence Intérieur immobile', category: 'Méditation', icon: '◎', theme: 432, voices: ['drone','flute'], duration: 15 },
+  { id: 'meditation-08', name: 'Ancrage Subtil clair', category: 'Méditation', icon: '◎', theme: 432, voices: ['drone','flute'], duration: 15 },
+  { id: 'meditation-09', name: 'Regard lumineux', category: 'Méditation', icon: '◎', theme: 432, voices: ['drone','flute'], duration: 20 },
+  { id: 'meditation-10', name: 'Vacuité ouverte', category: 'Méditation', icon: '◎', theme: 429, voices: ['drone','flute'], duration: 25 },
+  { id: 'meditation-11', name: 'Assise simple', category: 'Méditation', icon: '◎', theme: 432, voices: ['drone','flute'], duration: 20 },
+  { id: 'meditation-12', name: 'Instant serein', category: 'Méditation', icon: '◎', theme: 432, voices: ['drone','flute'], duration: 30 },
+  { id: 'meditation-13', name: 'Ancrage Subtil ouvert', category: 'Méditation', icon: '◎', theme: 432, voices: ['drone','flute'], duration: 15 },
+  { id: 'meditation-14', name: 'Vide Fécond ouvert', category: 'Méditation', icon: '◎', theme: 438, voices: ['drone','flute'], duration: 20 },
+  { id: 'meditation-15', name: 'Instant lumineux', category: 'Méditation', icon: '◎', theme: 432, voices: ['drone','flute'], duration: 15 },
+  { id: 'meditation-16', name: 'Espace serein', category: 'Méditation', icon: '◎', theme: 426, voices: ['drone','flute'], duration: 15 },
+  { id: 'meditation-17', name: 'Vacuité fluide', category: 'Méditation', icon: '◎', theme: 432, voices: ['drone','flute'], duration: 15 },
+  { id: 'meditation-18', name: 'Souffle centré', category: 'Méditation', icon: '◎', theme: 432, voices: ['drone','flute'], duration: 20 },
+  { id: 'meditation-19', name: 'Ancrage Subtil lumineux', category: 'Méditation', icon: '◎', theme: 438, voices: ['drone','flute'], duration: 15 },
+  { id: 'meditation-20', name: 'Éveil Doux fluide', category: 'Méditation', icon: '◎', theme: 432, voices: ['drone','flute'], duration: 25 },
+  { id: 'meditation-21', name: 'Clarté suspendue', category: 'Méditation', icon: '◎', theme: 432, voices: ['drone','flute'], duration: 25 },
+  { id: 'meditation-22', name: 'Instant fluide', category: 'Méditation', icon: '◎', theme: 432, voices: ['drone','flute'], duration: 20 },
+  { id: 'meditation-23', name: 'Voie du Cœur simple', category: 'Méditation', icon: '◎', theme: 432, voices: ['drone','flute'], duration: 15 },
+  { id: 'meditation-24', name: 'Espace intérieur', category: 'Méditation', icon: '◎', theme: 432, voices: ['drone','flute'], duration: 20 },
+  { id: 'meditation-25', name: 'Voie du Cœur lumineuse', category: 'Méditation', icon: '◎', theme: 432, voices: ['drone','flute'], duration: 20 },
+  { id: 'eveil-01', name: 'Halo Doré sacré', category: 'Éveil Spirituel', icon: '✦', theme: 528, voices: ['drone','bells','flute'], duration: 30 },
+  { id: 'eveil-02', name: 'Lumière Intérieure infinie', category: 'Éveil Spirituel', icon: '✦', theme: 528, voices: ['drone','bells','flute'], duration: 20 },
+  { id: 'eveil-03', name: 'Chant des Sphères doré', category: 'Éveil Spirituel', icon: '✦', theme: 528, voices: ['drone','bells','flute'], duration: 30 },
+  { id: 'eveil-04', name: 'Souffle Divin cristallin', category: 'Éveil Spirituel', icon: '✦', theme: 528, voices: ['drone','bells','flute'], duration: 20 },
+  { id: 'eveil-05', name: 'Appel Céleste radieux', category: 'Éveil Spirituel', icon: '✦', theme: 522, voices: ['drone','bells','flute'], duration: 30 },
+  { id: 'eveil-06', name: 'Envol doré', category: 'Éveil Spirituel', icon: '✦', theme: 528, voices: ['drone','bells','flute'], duration: 15 },
+  { id: 'eveil-07', name: 'Passage Lumineux sacré', category: 'Éveil Spirituel', icon: '✦', theme: 528, voices: ['drone','bells','flute'], duration: 30 },
+  { id: 'eveil-08', name: 'Chant des Sphères subtil', category: 'Éveil Spirituel', icon: '✦', theme: 528, voices: ['drone','bells','flute'], duration: 25 },
+  { id: 'eveil-09', name: 'Vibration d\'Amour sacrée', category: 'Éveil Spirituel', icon: '✦', theme: 525, voices: ['drone','bells','flute'], duration: 15 },
+  { id: 'eveil-10', name: 'Passage Lumineux radieux', category: 'Éveil Spirituel', icon: '✦', theme: 528, voices: ['drone','bells','flute'], duration: 20 },
+  { id: 'eveil-11', name: 'Éclat de l\'Âme subtil', category: 'Éveil Spirituel', icon: '✦', theme: 528, voices: ['drone','bells','flute'], duration: 20 },
+  { id: 'eveil-12', name: 'Vibration d\'Amour céleste', category: 'Éveil Spirituel', icon: '✦', theme: 528, voices: ['drone','bells','flute'], duration: 20 },
+  { id: 'eveil-13', name: 'Lumière Intérieure éthérée', category: 'Éveil Spirituel', icon: '✦', theme: 528, voices: ['drone','bells','flute'], duration: 20 },
+  { id: 'eveil-14', name: 'Éclat de l\'Âme céleste', category: 'Éveil Spirituel', icon: '✦', theme: 528, voices: ['drone','bells','flute'], duration: 25 },
+  { id: 'eveil-15', name: 'Halo Doré cristallin', category: 'Éveil Spirituel', icon: '✦', theme: 528, voices: ['drone','bells','flute'], duration: 25 },
+  { id: 'eveil-16', name: 'Halo Doré radieux', category: 'Éveil Spirituel', icon: '✦', theme: 522, voices: ['drone','bells','flute'], duration: 30 },
+  { id: 'eveil-17', name: 'Grâce céleste', category: 'Éveil Spirituel', icon: '✦', theme: 528, voices: ['drone','bells','flute'], duration: 25 },
+  { id: 'eveil-18', name: 'Éclat de l\'Âme éthéré', category: 'Éveil Spirituel', icon: '✦', theme: 525, voices: ['drone','bells','flute'], duration: 25 },
+  { id: 'eveil-19', name: 'Ascension Douce sacrée', category: 'Éveil Spirituel', icon: '✦', theme: 528, voices: ['drone','bells','flute'], duration: 15 },
+  { id: 'eveil-20', name: 'Portail infini', category: 'Éveil Spirituel', icon: '✦', theme: 528, voices: ['drone','bells','flute'], duration: 15 },
+  { id: 'eveil-21', name: 'Chant des Sphères sacré', category: 'Éveil Spirituel', icon: '✦', theme: 528, voices: ['drone','bells','flute'], duration: 25 },
+  { id: 'eveil-22', name: 'Aube Céleste infinie', category: 'Éveil Spirituel', icon: '✦', theme: 525, voices: ['drone','bells','flute'], duration: 15 },
+  { id: 'eveil-23', name: 'Grâce angélique', category: 'Éveil Spirituel', icon: '✦', theme: 528, voices: ['drone','bells','flute'], duration: 20 },
+  { id: 'eveil-24', name: 'Ascension Douce angélique', category: 'Éveil Spirituel', icon: '✦', theme: 522, voices: ['drone','bells','flute'], duration: 25 },
+  { id: 'eveil-25', name: 'Aile Invisible cristalline', category: 'Éveil Spirituel', icon: '✦', theme: 528, voices: ['drone','bells','flute'], duration: 15 },
+  { id: 'ancrage-01', name: 'Sève Profonde enracinée', category: 'Ancrage', icon: '▲', theme: 396, voices: ['drone','drum'], duration: 25 },
+  { id: 'ancrage-02', name: 'Racine constante', category: 'Ancrage', icon: '▲', theme: 390, voices: ['drone','drum'], duration: 25 },
+  { id: 'ancrage-03', name: 'Fondation constante', category: 'Ancrage', icon: '▲', theme: 396, voices: ['drone','drum'], duration: 25 },
+  { id: 'ancrage-04', name: 'Assise Terrestre dense', category: 'Ancrage', icon: '▲', theme: 396, voices: ['drone','drum'], duration: 20 },
+  { id: 'ancrage-05', name: 'Pas Lourd puissant', category: 'Ancrage', icon: '▲', theme: 396, voices: ['drone','drum'], duration: 15 },
+  { id: 'ancrage-06', name: 'Ancrage profond', category: 'Ancrage', icon: '▲', theme: 393, voices: ['drone','drum'], duration: 20 },
+  { id: 'ancrage-07', name: 'Terre-Mère terrestre', category: 'Ancrage', icon: '▲', theme: 396, voices: ['drone','drum'], duration: 20 },
+  { id: 'ancrage-08', name: 'Socle puissant', category: 'Ancrage', icon: '▲', theme: 393, voices: ['drone','drum'], duration: 20 },
+  { id: 'ancrage-09', name: 'Fondation stable', category: 'Ancrage', icon: '▲', theme: 396, voices: ['drone','drum'], duration: 20 },
+  { id: 'ancrage-10', name: 'Assise Terrestre enracinée', category: 'Ancrage', icon: '▲', theme: 396, voices: ['drone','drum'], duration: 30 },
+  { id: 'ancrage-11', name: 'Terre-Mère enracinée', category: 'Ancrage', icon: '▲', theme: 396, voices: ['drone','drum'], duration: 20 },
+  { id: 'ancrage-12', name: 'Marche Enracinée solide', category: 'Ancrage', icon: '▲', theme: 396, voices: ['drone','drum'], duration: 15 },
+  { id: 'ancrage-13', name: 'Pierre Ancestrale stable', category: 'Ancrage', icon: '▲', theme: 396, voices: ['drone','drum'], duration: 20 },
+  { id: 'ancrage-14', name: 'Ancrage solide', category: 'Ancrage', icon: '▲', theme: 396, voices: ['drone','drum'], duration: 15 },
+  { id: 'ancrage-15', name: 'Pas Lourd massif', category: 'Ancrage', icon: '▲', theme: 396, voices: ['drone','drum'], duration: 20 },
+  { id: 'ancrage-16', name: 'Sève Profonde constante', category: 'Ancrage', icon: '▲', theme: 396, voices: ['drone','drum'], duration: 15 },
+  { id: 'ancrage-17', name: 'Fondation puissante', category: 'Ancrage', icon: '▲', theme: 396, voices: ['drone','drum'], duration: 25 },
+  { id: 'ancrage-18', name: 'Ancrage millénaire', category: 'Ancrage', icon: '▲', theme: 396, voices: ['drone','drum'], duration: 15 },
+  { id: 'ancrage-19', name: 'Assise Terrestre profonde', category: 'Ancrage', icon: '▲', theme: 396, voices: ['drone','drum'], duration: 25 },
+  { id: 'ancrage-20', name: 'Assise Terrestre stable', category: 'Ancrage', icon: '▲', theme: 399, voices: ['drone','drum'], duration: 30 },
+  { id: 'ancrage-21', name: 'Sceau Terrestre massif', category: 'Ancrage', icon: '▲', theme: 399, voices: ['drone','drum'], duration: 25 },
+  { id: 'ancrage-22', name: 'Terre-Mère millénaire', category: 'Ancrage', icon: '▲', theme: 396, voices: ['drone','drum'], duration: 25 },
+  { id: 'ancrage-23', name: 'Socle constant', category: 'Ancrage', icon: '▲', theme: 396, voices: ['drone','drum'], duration: 15 },
+  { id: 'ancrage-24', name: 'Pierre Ancestrale solide', category: 'Ancrage', icon: '▲', theme: 396, voices: ['drone','drum'], duration: 15 },
+  { id: 'ancrage-25', name: 'Pas Lourd fertile', category: 'Ancrage', icon: '▲', theme: 396, voices: ['drone','drum'], duration: 15 },
+  { id: 'foret-01', name: 'Futaie ancienne', category: 'Forêt & Végétal', icon: '❋', theme: 432, voices: ['nature','flute'], duration: 20 },
+  { id: 'foret-02', name: 'Écorce Vivante verdoyante', category: 'Forêt & Végétal', icon: '❋', theme: 432, voices: ['nature','flute'], duration: 15 },
+  { id: 'foret-03', name: 'Écorce Vivante dense', category: 'Forêt & Végétal', icon: '❋', theme: 438, voices: ['nature','flute'], duration: 30 },
+  { id: 'foret-04', name: 'Sentier de Mousse ancien', category: 'Forêt & Végétal', icon: '❋', theme: 432, voices: ['nature','flute'], duration: 15 },
+  { id: 'foret-05', name: 'Futaie ombragée', category: 'Forêt & Végétal', icon: '❋', theme: 432, voices: ['nature','flute'], duration: 25 },
+  { id: 'foret-06', name: 'Clairière sylvestre', category: 'Forêt & Végétal', icon: '❋', theme: 432, voices: ['nature','flute'], duration: 20 },
+  { id: 'foret-07', name: 'Chemin des Fougères ancien', category: 'Forêt & Végétal', icon: '❋', theme: 432, voices: ['nature','flute'], duration: 15 },
+  { id: 'foret-08', name: 'Forêt ancienne', category: 'Forêt & Végétal', icon: '❋', theme: 432, voices: ['nature','flute'], duration: 25 },
+  { id: 'foret-09', name: 'Forêt vivante', category: 'Forêt & Végétal', icon: '❋', theme: 432, voices: ['nature','flute'], duration: 25 },
+  { id: 'foret-10', name: 'Souffle des Feuilles vert', category: 'Forêt & Végétal', icon: '❋', theme: 432, voices: ['nature','flute'], duration: 20 },
+  { id: 'foret-11', name: 'Chant des Arbres sylvestre', category: 'Forêt & Végétal', icon: '❋', theme: 432, voices: ['nature','flute'], duration: 15 },
+  { id: 'foret-12', name: 'Souffle des Feuilles dense', category: 'Forêt & Végétal', icon: '❋', theme: 432, voices: ['nature','flute'], duration: 25 },
+  { id: 'foret-13', name: 'Bosquet sauvage', category: 'Forêt & Végétal', icon: '❋', theme: 432, voices: ['nature','flute'], duration: 15 },
+  { id: 'foret-14', name: 'Clairière secrète', category: 'Forêt & Végétal', icon: '❋', theme: 432, voices: ['nature','flute'], duration: 25 },
+  { id: 'foret-15', name: 'Écorce Vivante humide', category: 'Forêt & Végétal', icon: '❋', theme: 432, voices: ['nature','flute'], duration: 25 },
+  { id: 'foret-16', name: 'Ombre Verte secrète', category: 'Forêt & Végétal', icon: '❋', theme: 432, voices: ['nature','flute'], duration: 20 },
+  { id: 'foret-17', name: 'Sous-Bois ancien', category: 'Forêt & Végétal', icon: '❋', theme: 432, voices: ['nature','flute'], duration: 25 },
+  { id: 'foret-18', name: 'Feuillage ancien', category: 'Forêt & Végétal', icon: '❋', theme: 432, voices: ['nature','flute'], duration: 25 },
+  { id: 'foret-19', name: 'Écorce Vivante tranquille', category: 'Forêt & Végétal', icon: '❋', theme: 426, voices: ['nature','flute'], duration: 25 },
+  { id: 'foret-20', name: 'Feuillage sylvestre', category: 'Forêt & Végétal', icon: '❋', theme: 432, voices: ['nature','flute'], duration: 25 },
+  { id: 'foret-21', name: 'Sentier de Mousse sylvestre', category: 'Forêt & Végétal', icon: '❋', theme: 432, voices: ['nature','flute'], duration: 20 },
+  { id: 'foret-22', name: 'Sous-Bois vert', category: 'Forêt & Végétal', icon: '❋', theme: 426, voices: ['nature','flute'], duration: 20 },
+  { id: 'foret-23', name: 'Ombre Verte ombragée', category: 'Forêt & Végétal', icon: '❋', theme: 432, voices: ['nature','flute'], duration: 25 },
+  { id: 'foret-24', name: 'Rosée du Matin verdoyante', category: 'Forêt & Végétal', icon: '❋', theme: 432, voices: ['nature','flute'], duration: 25 },
+  { id: 'foret-25', name: 'Chemin des Fougères verdoyant', category: 'Forêt & Végétal', icon: '❋', theme: 432, voices: ['nature','flute'], duration: 20 },
+  { id: 'ocean-01', name: 'Vague lointaine', category: 'Océan & Profondeurs Marines', icon: '≈', theme: 432, voices: ['nature','drone'], duration: 20 },
+  { id: 'ocean-02', name: 'Souffle des Flots salé', category: 'Océan & Profondeurs Marines', icon: '≈', theme: 432, voices: ['nature','drone'], duration: 15 },
+  { id: 'ocean-03', name: 'Marée infinie', category: 'Océan & Profondeurs Marines', icon: '≈', theme: 426, voices: ['nature','drone'], duration: 25 },
+  { id: 'ocean-04', name: 'Chant de l\'Océan salé', category: 'Océan & Profondeurs Marines', icon: '≈', theme: 432, voices: ['nature','drone'], duration: 25 },
+  { id: 'ocean-05', name: 'Vague salée', category: 'Océan & Profondeurs Marines', icon: '≈', theme: 432, voices: ['nature','drone'], duration: 25 },
+  { id: 'ocean-06', name: 'Silence des Fonds vaste', category: 'Océan & Profondeurs Marines', icon: '≈', theme: 432, voices: ['nature','drone'], duration: 20 },
+  { id: 'ocean-07', name: 'Écume infinie', category: 'Océan & Profondeurs Marines', icon: '≈', theme: 432, voices: ['nature','drone'], duration: 30 },
+  { id: 'ocean-08', name: 'Écume lointaine', category: 'Océan & Profondeurs Marines', icon: '≈', theme: 426, voices: ['nature','drone'], duration: 20 },
+  { id: 'ocean-09', name: 'Vague calme', category: 'Océan & Profondeurs Marines', icon: '≈', theme: 432, voices: ['nature','drone'], duration: 30 },
+  { id: 'ocean-10', name: 'Marée salée', category: 'Océan & Profondeurs Marines', icon: '≈', theme: 435, voices: ['nature','drone'], duration: 20 },
+  { id: 'ocean-11', name: 'Profondeur silencieuse', category: 'Océan & Profondeurs Marines', icon: '≈', theme: 432, voices: ['nature','drone'], duration: 20 },
+  { id: 'ocean-12', name: 'Chant de l\'Océan bleu', category: 'Océan & Profondeurs Marines', icon: '≈', theme: 432, voices: ['nature','drone'], duration: 20 },
+  { id: 'ocean-13', name: 'Abysse profond', category: 'Océan & Profondeurs Marines', icon: '≈', theme: 432, voices: ['nature','drone'], duration: 15 },
+  { id: 'ocean-14', name: 'Chant de l\'Océan immense', category: 'Océan & Profondeurs Marines', icon: '≈', theme: 432, voices: ['nature','drone'], duration: 25 },
+  { id: 'ocean-15', name: 'Danse des Vagues bleue', category: 'Océan & Profondeurs Marines', icon: '≈', theme: 432, voices: ['nature','drone'], duration: 30 },
+  { id: 'ocean-16', name: 'Danse des Vagues lointaine', category: 'Océan & Profondeurs Marines', icon: '≈', theme: 432, voices: ['nature','drone'], duration: 30 },
+  { id: 'ocean-17', name: 'Grotte Sous-Marine cristalline', category: 'Océan & Profondeurs Marines', icon: '≈', theme: 426, voices: ['nature','drone'], duration: 15 },
+  { id: 'ocean-18', name: 'Écume insondable', category: 'Océan & Profondeurs Marines', icon: '≈', theme: 426, voices: ['nature','drone'], duration: 25 },
+  { id: 'ocean-19', name: 'Courant Marin profond', category: 'Océan & Profondeurs Marines', icon: '≈', theme: 429, voices: ['nature','drone'], duration: 15 },
+  { id: 'ocean-20', name: 'Récif insondable', category: 'Océan & Profondeurs Marines', icon: '≈', theme: 432, voices: ['nature','drone'], duration: 15 },
+  { id: 'ocean-21', name: 'Marée cristalline', category: 'Océan & Profondeurs Marines', icon: '≈', theme: 432, voices: ['nature','drone'], duration: 20 },
+  { id: 'ocean-22', name: 'Horizon Bleu vaste', category: 'Océan & Profondeurs Marines', icon: '≈', theme: 429, voices: ['nature','drone'], duration: 25 },
+  { id: 'ocean-23', name: 'Vague insondable', category: 'Océan & Profondeurs Marines', icon: '≈', theme: 432, voices: ['nature','drone'], duration: 20 },
+  { id: 'ocean-24', name: 'Sillage vaste', category: 'Océan & Profondeurs Marines', icon: '≈', theme: 432, voices: ['nature','drone'], duration: 15 },
+  { id: 'ocean-25', name: 'Vague profonde', category: 'Océan & Profondeurs Marines', icon: '≈', theme: 426, voices: ['nature','drone'], duration: 30 },
+  { id: 'elements-01', name: 'Cyclone Léger cristallin', category: 'Éléments', icon: '✺', theme: 417, voices: ['drum','nature'], duration: 15 },
+  { id: 'elements-02', name: 'Cœur du Brasier aérien', category: 'Éléments', icon: '✺', theme: 417, voices: ['drum','nature'], duration: 15 },
+  { id: 'elements-03', name: 'Bourrasque cristalline', category: 'Éléments', icon: '✺', theme: 417, voices: ['drum','nature'], duration: 20 },
+  { id: 'elements-04', name: 'Vent Ancien cristallin', category: 'Éléments', icon: '✺', theme: 417, voices: ['drum','nature'], duration: 20 },
+  { id: 'elements-05', name: 'Tempête Douce tellurique', category: 'Éléments', icon: '✺', theme: 417, voices: ['drum','nature'], duration: 20 },
+  { id: 'elements-06', name: 'Éclair Silencieux vibrant', category: 'Éléments', icon: '✺', theme: 417, voices: ['drum','nature'], duration: 20 },
+  { id: 'elements-07', name: 'Étincelle limpide', category: 'Éléments', icon: '✺', theme: 417, voices: ['drum','nature'], duration: 15 },
+  { id: 'elements-08', name: 'Éclat de Foudre cristallin', category: 'Éléments', icon: '✺', theme: 417, voices: ['drum','nature'], duration: 20 },
+  { id: 'elements-09', name: 'Vapeur Ascendante fougueuse', category: 'Éléments', icon: '✺', theme: 417, voices: ['drum','nature'], duration: 30 },
+  { id: 'elements-10', name: 'Flamme Intérieure libre', category: 'Éléments', icon: '✺', theme: 417, voices: ['drum','nature'], duration: 25 },
+  { id: 'elements-11', name: 'Torrent léger', category: 'Éléments', icon: '✺', theme: 417, voices: ['drum','nature'], duration: 20 },
+  { id: 'elements-12', name: 'Flamme Intérieure légère', category: 'Éléments', icon: '✺', theme: 417, voices: ['drum','nature'], duration: 20 },
+  { id: 'elements-13', name: 'Tempête Douce vibrante', category: 'Éléments', icon: '✺', theme: 420, voices: ['drum','nature'], duration: 20 },
+  { id: 'elements-14', name: 'Éclair Silencieux libre', category: 'Éléments', icon: '✺', theme: 417, voices: ['drum','nature'], duration: 20 },
+  { id: 'elements-15', name: 'Éclat de Foudre ardent', category: 'Éléments', icon: '✺', theme: 420, voices: ['drum','nature'], duration: 20 },
+  { id: 'elements-16', name: 'Feu Sacré fougueux', category: 'Éléments', icon: '✺', theme: 417, voices: ['drum','nature'], duration: 20 },
+  { id: 'elements-17', name: 'Tempête Douce aérienne', category: 'Éléments', icon: '✺', theme: 417, voices: ['drum','nature'], duration: 25 },
+  { id: 'elements-18', name: 'Onde de Chaleur tellurique', category: 'Éléments', icon: '✺', theme: 417, voices: ['drum','nature'], duration: 20 },
+  { id: 'elements-19', name: 'Éclair Silencieux aérien', category: 'Éléments', icon: '✺', theme: 420, voices: ['drum','nature'], duration: 15 },
+  { id: 'elements-20', name: 'Souffle du Vent libre', category: 'Éléments', icon: '✺', theme: 420, voices: ['drum','nature'], duration: 15 },
+  { id: 'elements-21', name: 'Vapeur Ascendante tellurique', category: 'Éléments', icon: '✺', theme: 414, voices: ['drum','nature'], duration: 20 },
+  { id: 'elements-22', name: 'Étincelle vive', category: 'Éléments', icon: '✺', theme: 417, voices: ['drum','nature'], duration: 20 },
+  { id: 'elements-23', name: 'Flamme Intérieure impétueuse', category: 'Éléments', icon: '✺', theme: 417, voices: ['drum','nature'], duration: 20 },
+  { id: 'elements-24', name: 'Éclat de Foudre libre', category: 'Éléments', icon: '✺', theme: 411, voices: ['drum','nature'], duration: 20 },
+  { id: 'elements-25', name: 'Éclat de Foudre impétueux', category: 'Éléments', icon: '✺', theme: 417, voices: ['drum','nature'], duration: 30 },
+  { id: 'chant-01', name: 'Choeur Invisible harmonieux', category: 'Chant Sacré & Choral', icon: '♫', theme: 639, voices: ['drone','bells'], duration: 20 },
+  { id: 'chant-02', name: 'Choeur Invisible vibrant', category: 'Chant Sacré & Choral', icon: '♫', theme: 639, voices: ['drone','bells'], duration: 15 },
+  { id: 'chant-03', name: 'Psaume du Cœur choral', category: 'Chant Sacré & Choral', icon: '♫', theme: 639, voices: ['drone','bells'], duration: 20 },
+  { id: 'chant-04', name: 'Cantique Intérieur grave', category: 'Chant Sacré & Choral', icon: '♫', theme: 642, voices: ['drone','bells'], duration: 20 },
+  { id: 'chant-05', name: 'Cantique Intérieur pure', category: 'Chant Sacré & Choral', icon: '♫', theme: 639, voices: ['drone','bells'], duration: 30 },
+  { id: 'chant-06', name: 'Cantique Intérieur sacrée', category: 'Chant Sacré & Choral', icon: '♫', theme: 639, voices: ['drone','bells'], duration: 15 },
+  { id: 'chant-07', name: 'Souffle Choral uni', category: 'Chant Sacré & Choral', icon: '♫', theme: 639, voices: ['drone','bells'], duration: 20 },
+  { id: 'chant-08', name: 'Nef de Pierre vibrante', category: 'Chant Sacré & Choral', icon: '♫', theme: 639, voices: ['drone','bells'], duration: 20 },
+  { id: 'chant-09', name: 'Antienne chorale', category: 'Chant Sacré & Choral', icon: '♫', theme: 639, voices: ['drone','bells'], duration: 15 },
+  { id: 'chant-10', name: 'Cantique Intérieur solennelle', category: 'Chant Sacré & Choral', icon: '♫', theme: 639, voices: ['drone','bells'], duration: 20 },
+  { id: 'chant-11', name: 'Chant des Anciens profond', category: 'Chant Sacré & Choral', icon: '♫', theme: 639, voices: ['drone','bells'], duration: 20 },
+  { id: 'chant-12', name: 'Litanie pure', category: 'Chant Sacré & Choral', icon: '♫', theme: 639, voices: ['drone','bells'], duration: 15 },
+  { id: 'chant-13', name: 'Sanctuaire de Pierre vibrant', category: 'Chant Sacré & Choral', icon: '♫', theme: 639, voices: ['drone','bells'], duration: 30 },
+  { id: 'chant-14', name: 'Prière Chantée harmonieuse', category: 'Chant Sacré & Choral', icon: '♫', theme: 639, voices: ['drone','bells'], duration: 30 },
+  { id: 'chant-15', name: 'Souffle Choral résonnant', category: 'Chant Sacré & Choral', icon: '♫', theme: 639, voices: ['drone','bells'], duration: 30 },
+  { id: 'chant-16', name: 'Chant des Anciens résonnant', category: 'Chant Sacré & Choral', icon: '♫', theme: 639, voices: ['drone','bells'], duration: 25 },
+  { id: 'chant-17', name: 'Écho de la Voûte choral', category: 'Chant Sacré & Choral', icon: '♫', theme: 639, voices: ['drone','bells'], duration: 15 },
+  { id: 'chant-18', name: 'Nef de Pierre ancienne', category: 'Chant Sacré & Choral', icon: '♫', theme: 639, voices: ['drone','bells'], duration: 15 },
+  { id: 'chant-19', name: 'Prière Chantée chorale', category: 'Chant Sacré & Choral', icon: '♫', theme: 633, voices: ['drone','bells'], duration: 25 },
+  { id: 'chant-20', name: 'Nef de Pierre harmonieuse', category: 'Chant Sacré & Choral', icon: '♫', theme: 639, voices: ['drone','bells'], duration: 15 },
+  { id: 'chant-21', name: 'Litanie grave', category: 'Chant Sacré & Choral', icon: '♫', theme: 639, voices: ['drone','bells'], duration: 30 },
+  { id: 'chant-22', name: 'Sanctuaire de Pierre éternel', category: 'Chant Sacré & Choral', icon: '♫', theme: 639, voices: ['drone','bells'], duration: 20 },
+  { id: 'chant-23', name: 'Vibration Sacrée solennelle', category: 'Chant Sacré & Choral', icon: '♫', theme: 642, voices: ['drone','bells'], duration: 25 },
+  { id: 'chant-24', name: 'Écho de la Voûte solennel', category: 'Chant Sacré & Choral', icon: '♫', theme: 639, voices: ['drone','bells'], duration: 25 },
+  { id: 'chant-25', name: 'Écho de la Voûte vibrant', category: 'Chant Sacré & Choral', icon: '♫', theme: 642, voices: ['drone','bells'], duration: 25 },
+  { id: 'guerison-01', name: 'Centre du Cœur ouvert', category: 'Guérison & Chakras', icon: '✥', theme: 741, voices: ['drone','bells'], duration: 25 },
+  { id: 'guerison-02', name: 'Flux Harmonisé doux', category: 'Guérison & Chakras', icon: '✥', theme: 741, voices: ['drone','bells'], duration: 15 },
+  { id: 'guerison-03', name: 'Point d\'Ancrage Subtil rayonnant', category: 'Guérison & Chakras', icon: '✥', theme: 741, voices: ['drone','bells'], duration: 20 },
+  { id: 'guerison-04', name: 'Onde Réparatrice subtile', category: 'Guérison & Chakras', icon: '✥', theme: 741, voices: ['drone','bells'], duration: 20 },
+  { id: 'guerison-05', name: 'Vortex Doux fluide', category: 'Guérison & Chakras', icon: '✥', theme: 741, voices: ['drone','bells'], duration: 25 },
+  { id: 'guerison-06', name: 'Colonne de Lumière fluide', category: 'Guérison & Chakras', icon: '✥', theme: 741, voices: ['drone','bells'], duration: 20 },
+  { id: 'guerison-07', name: 'Colonne de Lumière claire', category: 'Guérison & Chakras', icon: '✥', theme: 741, voices: ['drone','bells'], duration: 20 },
+  { id: 'guerison-08', name: 'Onde Réparatrice claire', category: 'Guérison & Chakras', icon: '✥', theme: 741, voices: ['drone','bells'], duration: 25 },
+  { id: 'guerison-09', name: 'Spirale Guérisseuse claire', category: 'Guérison & Chakras', icon: '✥', theme: 741, voices: ['drone','bells'], duration: 20 },
+  { id: 'guerison-10', name: 'Chakra Racine rayonnant', category: 'Guérison & Chakras', icon: '✥', theme: 741, voices: ['drone','bells'], duration: 15 },
+  { id: 'guerison-11', name: 'Circulation d\'Énergie équilibrante', category: 'Guérison & Chakras', icon: '✥', theme: 738, voices: ['drone','bells'], duration: 20 },
+  { id: 'guerison-12', name: 'Souffle Réparateur régénérant', category: 'Guérison & Chakras', icon: '✥', theme: 747, voices: ['drone','bells'], duration: 30 },
+  { id: 'guerison-13', name: 'Circulation d\'Énergie réparatrice', category: 'Guérison & Chakras', icon: '✥', theme: 735, voices: ['drone','bells'], duration: 30 },
+  { id: 'guerison-14', name: 'Onde Réparatrice régénérante', category: 'Guérison & Chakras', icon: '✥', theme: 741, voices: ['drone','bells'], duration: 20 },
+  { id: 'guerison-15', name: 'Nœud Dénoué équilibrant', category: 'Guérison & Chakras', icon: '✥', theme: 741, voices: ['drone','bells'], duration: 20 },
+  { id: 'guerison-16', name: 'Point d\'Ancrage Subtil doux', category: 'Guérison & Chakras', icon: '✥', theme: 735, voices: ['drone','bells'], duration: 25 },
+  { id: 'guerison-17', name: 'Onde Réparatrice équilibrante', category: 'Guérison & Chakras', icon: '✥', theme: 741, voices: ['drone','bells'], duration: 20 },
+  { id: 'guerison-18', name: 'Vortex Doux aligné', category: 'Guérison & Chakras', icon: '✥', theme: 741, voices: ['drone','bells'], duration: 15 },
+  { id: 'guerison-19', name: 'Flux Harmonisé équilibrant', category: 'Guérison & Chakras', icon: '✥', theme: 741, voices: ['drone','bells'], duration: 30 },
+  { id: 'guerison-20', name: 'Centre du Cœur fluide', category: 'Guérison & Chakras', icon: '✥', theme: 741, voices: ['drone','bells'], duration: 25 },
+  { id: 'guerison-21', name: 'Circulation d\'Énergie régénérante', category: 'Guérison & Chakras', icon: '✥', theme: 741, voices: ['drone','bells'], duration: 20 },
+  { id: 'guerison-22', name: 'Colonne de Lumière équilibrante', category: 'Guérison & Chakras', icon: '✥', theme: 741, voices: ['drone','bells'], duration: 20 },
+  { id: 'guerison-23', name: 'Colonne de Lumière douce', category: 'Guérison & Chakras', icon: '✥', theme: 741, voices: ['drone','bells'], duration: 25 },
+  { id: 'guerison-24', name: 'Nœud Dénoué fluide', category: 'Guérison & Chakras', icon: '✥', theme: 741, voices: ['drone','bells'], duration: 20 },
+  { id: 'guerison-25', name: 'Clé du Cœur vitale', category: 'Guérison & Chakras', icon: '✥', theme: 738, voices: ['drone','bells'], duration: 15 },
+  { id: 'voyage-01', name: 'Sentier Invisible nébuleux', category: 'Voyage Mystique', icon: '✧', theme: 849, voices: ['drone','flute','bells'], duration: 25 },
+  { id: 'voyage-02', name: 'Traversée Silencieuse infinie', category: 'Voyage Mystique', icon: '✧', theme: 852, voices: ['drone','flute','bells'], duration: 20 },
+  { id: 'voyage-03', name: 'Miroir des Songes silencieux', category: 'Voyage Mystique', icon: '✧', theme: 852, voices: ['drone','flute','bells'], duration: 20 },
+  { id: 'voyage-04', name: 'Passage Secret infini', category: 'Voyage Mystique', icon: '✧', theme: 852, voices: ['drone','flute','bells'], duration: 25 },
+  { id: 'voyage-05', name: 'Seuil Invisible suspendu', category: 'Voyage Mystique', icon: '✧', theme: 852, voices: ['drone','flute','bells'], duration: 15 },
+  { id: 'voyage-06', name: 'Souffle du Mystère voilé', category: 'Voyage Mystique', icon: '✧', theme: 852, voices: ['drone','flute','bells'], duration: 20 },
+  { id: 'voyage-07', name: 'Chemin des Étoiles mystique', category: 'Voyage Mystique', icon: '✧', theme: 855, voices: ['drone','flute','bells'], duration: 15 },
+  { id: 'voyage-08', name: 'Porte des Songes suspendue', category: 'Voyage Mystique', icon: '✧', theme: 852, voices: ['drone','flute','bells'], duration: 25 },
+  { id: 'voyage-09', name: 'Traversée Silencieuse nébuleuse', category: 'Voyage Mystique', icon: '✧', theme: 852, voices: ['drone','flute','bells'], duration: 30 },
+  { id: 'voyage-10', name: 'Dérive Céleste insondable', category: 'Voyage Mystique', icon: '✧', theme: 858, voices: ['drone','flute','bells'], duration: 20 },
+  { id: 'voyage-11', name: 'Nébuleuse Intérieure insondable', category: 'Voyage Mystique', icon: '✧', theme: 852, voices: ['drone','flute','bells'], duration: 15 },
+  { id: 'voyage-12', name: 'Constellation Intérieure onirique', category: 'Voyage Mystique', icon: '✧', theme: 852, voices: ['drone','flute','bells'], duration: 20 },
+  { id: 'voyage-13', name: 'Porte des Songes onirique', category: 'Voyage Mystique', icon: '✧', theme: 849, voices: ['drone','flute','bells'], duration: 20 },
+  { id: 'voyage-14', name: 'Sentier Invisible astral', category: 'Voyage Mystique', icon: '✧', theme: 852, voices: ['drone','flute','bells'], duration: 20 },
+  { id: 'voyage-15', name: 'Envol Nocturne infini', category: 'Voyage Mystique', icon: '✧', theme: 852, voices: ['drone','flute','bells'], duration: 20 },
+  { id: 'voyage-16', name: 'Miroir des Songes onirique', category: 'Voyage Mystique', icon: '✧', theme: 852, voices: ['drone','flute','bells'], duration: 15 },
+  { id: 'voyage-17', name: 'Seuil Invisible mystique', category: 'Voyage Mystique', icon: '✧', theme: 852, voices: ['drone','flute','bells'], duration: 30 },
+  { id: 'voyage-18', name: 'Dérive Céleste infinie', category: 'Voyage Mystique', icon: '✧', theme: 852, voices: ['drone','flute','bells'], duration: 20 },
+  { id: 'voyage-19', name: 'Miroir des Songes suspendu', category: 'Voyage Mystique', icon: '✧', theme: 852, voices: ['drone','flute','bells'], duration: 20 },
+  { id: 'voyage-20', name: 'Passage Secret nébuleux', category: 'Voyage Mystique', icon: '✧', theme: 852, voices: ['drone','flute','bells'], duration: 20 },
+  { id: 'voyage-21', name: 'Dérive Céleste voilée', category: 'Voyage Mystique', icon: '✧', theme: 855, voices: ['drone','flute','bells'], duration: 25 },
+  { id: 'voyage-22', name: 'Brume Mystique nébuleuse', category: 'Voyage Mystique', icon: '✧', theme: 852, voices: ['drone','flute','bells'], duration: 15 },
+  { id: 'voyage-23', name: 'Brume Mystique insondable', category: 'Voyage Mystique', icon: '✧', theme: 852, voices: ['drone','flute','bells'], duration: 25 },
+  { id: 'voyage-24', name: 'Traversée Silencieuse secrète', category: 'Voyage Mystique', icon: '✧', theme: 858, voices: ['drone','flute','bells'], duration: 30 },
+  { id: 'voyage-25', name: 'Envol Nocturne nébuleux', category: 'Voyage Mystique', icon: '✧', theme: 852, voices: ['drone','flute','bells'], duration: 30 },
+  { id: 'amour-01', name: 'Chaleur Intérieure douce', category: 'Amour & Compassion', icon: '♡', theme: 528, voices: ['drone','flute'], duration: 20 },
+  { id: 'amour-02', name: 'Élan Sincère tendre', category: 'Amour & Compassion', icon: '♡', theme: 528, voices: ['drone','flute'], duration: 25 },
+  { id: 'amour-03', name: 'Cœur Ouvert simple', category: 'Amour & Compassion', icon: '♡', theme: 528, voices: ['drone','flute'], duration: 20 },
+  { id: 'amour-04', name: 'Lumière Bienveillante rayonnante', category: 'Amour & Compassion', icon: '♡', theme: 528, voices: ['drone','flute'], duration: 30 },
+  { id: 'amour-05', name: 'Vague de Tendresse apaisante', category: 'Amour & Compassion', icon: '♡', theme: 528, voices: ['drone','flute'], duration: 15 },
+  { id: 'amour-06', name: 'Étreinte Douce pure', category: 'Amour & Compassion', icon: '♡', theme: 525, voices: ['drone','flute'], duration: 20 },
+  { id: 'amour-07', name: 'Pardon Doux tendre', category: 'Amour & Compassion', icon: '♡', theme: 528, voices: ['drone','flute'], duration: 25 },
+  { id: 'amour-08', name: 'Étreinte Douce lumineuse', category: 'Amour & Compassion', icon: '♡', theme: 528, voices: ['drone','flute'], duration: 25 },
+  { id: 'amour-09', name: 'Lumière Bienveillante sincère', category: 'Amour & Compassion', icon: '♡', theme: 528, voices: ['drone','flute'], duration: 20 },
+  { id: 'amour-10', name: 'Don Silencieux bienveillant', category: 'Amour & Compassion', icon: '♡', theme: 528, voices: ['drone','flute'], duration: 20 },
+  { id: 'amour-11', name: 'Élan Sincère doux', category: 'Amour & Compassion', icon: '♡', theme: 528, voices: ['drone','flute'], duration: 30 },
+  { id: 'amour-12', name: 'Grâce du Cœur apaisante', category: 'Amour & Compassion', icon: '♡', theme: 525, voices: ['drone','flute'], duration: 20 },
+  { id: 'amour-13', name: 'Lumière Bienveillante douce', category: 'Amour & Compassion', icon: '♡', theme: 522, voices: ['drone','flute'], duration: 20 },
+  { id: 'amour-14', name: 'Sourire Intérieur sincère', category: 'Amour & Compassion', icon: '♡', theme: 528, voices: ['drone','flute'], duration: 25 },
+  { id: 'amour-15', name: 'Pardon Doux lumineux', category: 'Amour & Compassion', icon: '♡', theme: 528, voices: ['drone','flute'], duration: 15 },
+  { id: 'amour-16', name: 'Chaleur Intérieure généreuse', category: 'Amour & Compassion', icon: '♡', theme: 528, voices: ['drone','flute'], duration: 30 },
+  { id: 'amour-17', name: 'Vague de Tendresse lumineuse', category: 'Amour & Compassion', icon: '♡', theme: 528, voices: ['drone','flute'], duration: 15 },
+  { id: 'amour-18', name: 'Étreinte Douce bienveillante', category: 'Amour & Compassion', icon: '♡', theme: 528, voices: ['drone','flute'], duration: 20 },
+  { id: 'amour-19', name: 'Chaleur Intérieure simple', category: 'Amour & Compassion', icon: '♡', theme: 528, voices: ['drone','flute'], duration: 25 },
+  { id: 'amour-20', name: 'Pardon Doux simple', category: 'Amour & Compassion', icon: '♡', theme: 525, voices: ['drone','flute'], duration: 20 },
+  { id: 'amour-21', name: 'Accueil sincère', category: 'Amour & Compassion', icon: '♡', theme: 528, voices: ['drone','flute'], duration: 15 },
+  { id: 'amour-22', name: 'Élan Sincère chaleureux', category: 'Amour & Compassion', icon: '♡', theme: 528, voices: ['drone','flute'], duration: 30 },
+  { id: 'amour-23', name: 'Souffle du Cœur apaisant', category: 'Amour & Compassion', icon: '♡', theme: 531, voices: ['drone','flute'], duration: 20 },
+  { id: 'amour-24', name: 'Accueil simple', category: 'Amour & Compassion', icon: '♡', theme: 528, voices: ['drone','flute'], duration: 15 },
+  { id: 'amour-25', name: 'Accueil bienveillant', category: 'Amour & Compassion', icon: '♡', theme: 534, voices: ['drone','flute'], duration: 15 },
+  { id: 'purification-01', name: 'Aube Intérieure fraîche', category: 'Purification & Renouveau', icon: '✳', theme: 963, voices: ['nature','drone'], duration: 15 },
+  { id: 'purification-02', name: 'Lumière du Matin vive', category: 'Purification & Renouveau', icon: '✳', theme: 963, voices: ['nature','drone'], duration: 20 },
+  { id: 'purification-03', name: 'Matin Clair pur', category: 'Purification & Renouveau', icon: '✳', theme: 957, voices: ['nature','drone'], duration: 20 },
+  { id: 'purification-04', name: 'Renaissance Douce légère', category: 'Purification & Renouveau', icon: '✳', theme: 963, voices: ['nature','drone'], duration: 20 },
+  { id: 'purification-05', name: 'Chemin Libéré clair', category: 'Purification & Renouveau', icon: '✳', theme: 969, voices: ['nature','drone'], duration: 30 },
+  { id: 'purification-06', name: 'Eau Vive limpide', category: 'Purification & Renouveau', icon: '✳', theme: 963, voices: ['nature','drone'], duration: 20 },
+  { id: 'purification-07', name: 'Page Blanche claire', category: 'Purification & Renouveau', icon: '✳', theme: 963, voices: ['nature','drone'], duration: 30 },
+  { id: 'purification-08', name: 'Eau Vive pure', category: 'Purification & Renouveau', icon: '✳', theme: 963, voices: ['nature','drone'], duration: 15 },
+  { id: 'purification-09', name: 'Vague de Clarté vive', category: 'Purification & Renouveau', icon: '✳', theme: 963, voices: ['nature','drone'], duration: 20 },
+  { id: 'purification-10', name: 'Source Claire régénérante', category: 'Purification & Renouveau', icon: '✳', theme: 963, voices: ['nature','drone'], duration: 25 },
+  { id: 'purification-11', name: 'Eau Vive épurée', category: 'Purification & Renouveau', icon: '✳', theme: 963, voices: ['nature','drone'], duration: 30 },
+  { id: 'purification-12', name: 'Page Blanche légère', category: 'Purification & Renouveau', icon: '✳', theme: 969, voices: ['nature','drone'], duration: 20 },
+  { id: 'purification-13', name: 'Lumière du Matin limpide', category: 'Purification & Renouveau', icon: '✳', theme: 960, voices: ['nature','drone'], duration: 25 },
+  { id: 'purification-14', name: 'Matin Clair transparent', category: 'Purification & Renouveau', icon: '✳', theme: 963, voices: ['nature','drone'], duration: 15 },
+  { id: 'purification-15', name: 'Nouvel Élan limpide', category: 'Purification & Renouveau', icon: '✳', theme: 963, voices: ['nature','drone'], duration: 20 },
+  { id: 'purification-16', name: 'Chemin Libéré limpide', category: 'Purification & Renouveau', icon: '✳', theme: 963, voices: ['nature','drone'], duration: 25 },
+  { id: 'purification-17', name: 'Souffle Neuf léger', category: 'Purification & Renouveau', icon: '✳', theme: 963, voices: ['nature','drone'], duration: 25 },
+  { id: 'purification-18', name: 'Renaissance Douce transparente', category: 'Purification & Renouveau', icon: '✳', theme: 966, voices: ['nature','drone'], duration: 15 },
+  { id: 'purification-19', name: 'Cycle Renouvelé léger', category: 'Purification & Renouveau', icon: '✳', theme: 963, voices: ['nature','drone'], duration: 25 },
+  { id: 'purification-20', name: 'Nouvel Élan léger', category: 'Purification & Renouveau', icon: '✳', theme: 963, voices: ['nature','drone'], duration: 25 },
+  { id: 'purification-21', name: 'Vague de Clarté transparente', category: 'Purification & Renouveau', icon: '✳', theme: 963, voices: ['nature','drone'], duration: 25 },
+  { id: 'purification-22', name: 'Matin Clair renaissant', category: 'Purification & Renouveau', icon: '✳', theme: 963, voices: ['nature','drone'], duration: 25 },
+  { id: 'purification-23', name: 'Chemin Libéré régénérant', category: 'Purification & Renouveau', icon: '✳', theme: 957, voices: ['nature','drone'], duration: 20 },
+  { id: 'purification-24', name: 'Clarté Retrouvée claire', category: 'Purification & Renouveau', icon: '✳', theme: 963, voices: ['nature','drone'], duration: 25 },
+  { id: 'purification-25', name: 'Source Claire cristalline', category: 'Purification & Renouveau', icon: '✳', theme: 963, voices: ['nature','drone'], duration: 20 }
+];
+const CATEGORIES = ['Tout', ...Array.from(new Set(PRESETS.map(p => p.category)))];
+
+let activeCategory = 'Tout';
+let searchQuery = '';
+let library = {}; // id -> { status: 'none'|'loading'|'ready', blobUrl }
+
+const tabsEl = document.getElementById('tabs');
+const trackListEl = document.getElementById('trackList');
+const searchInput = document.getElementById('searchInput');
+const audioEl = document.getElementById('audioEl');
+const playerEl = document.getElementById('player');
+const playerTrackName = document.getElementById('playerTrackName');
+const playerTrackMeta = document.getElementById('playerTrackMeta');
+const playPauseBtn = document.getElementById('playPauseBtn');
+const shuffleBtn = document.getElementById('shuffleBtn');
+const loopBtn = document.getElementById('loopBtn');
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+
+let currentTrackId = null;
+let shuffleOn = false;
+let loopOn = false;
+
+// ===== IndexedDB : stockage persistant des MP3 générés =====
+let dbPromise = null;
+function openDb() {
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open('frequences-sacrees-db', 1);
+    req.onupgradeneeded = () => req.result.createObjectStore('tracks');
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  return dbPromise;
+}
+async function saveTrackBlob(id, blob) {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('tracks', 'readwrite');
+    tx.objectStore('tracks').put(blob, id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+async function getTrackBlob(id) {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('tracks', 'readonly');
+    const req = tx.objectStore('tracks').get(id);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function loadExistingLibrary() {
+  for (const p of PRESETS) {
+    const blob = await getTrackBlob(p.id);
+    if (blob) library[p.id] = { status: 'ready', blobUrl: URL.createObjectURL(blob) };
+  }
+  renderTracks();
+}
+
+// ===== UI : onglets catégories =====
+function renderTabs() {
+  tabsEl.innerHTML = '';
+  CATEGORIES.forEach(cat => {
+    const el = document.createElement('div');
+    el.className = 'tab' + (cat === activeCategory ? ' active' : '');
+    el.textContent = cat;
+    el.onclick = () => { activeCategory = cat; renderTabs(); renderTracks(); };
+    tabsEl.appendChild(el);
+  });
+}
+renderTabs();
+
+searchInput.addEventListener('input', () => {
+  searchQuery = searchInput.value.trim().toLowerCase();
+  renderTracks();
+});
+
+// ===== UI : liste des morceaux =====
+function getFilteredSortedPresets() {
+  return PRESETS
+    .filter(p => activeCategory === 'Tout' || p.category === activeCategory)
+    .filter(p => p.name.toLowerCase().includes(searchQuery))
+    .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+}
+
+function renderTracks() {
+  const list = getFilteredSortedPresets();
+  trackListEl.innerHTML = '';
+  if (list.length === 0) {
+    trackListEl.innerHTML = '<div class="empty-msg">Aucun morceau trouvé.</div>';
+    return;
+  }
+  list.forEach(p => {
+    const state = library[p.id] || { status: 'none' };
+    const row = document.createElement('div');
+    row.className = 'track' + (currentTrackId === p.id ? ' playing' : '');
+    row.innerHTML = `
+      <div class="track-icon">${p.icon}</div>
+      <div class="track-info">
+        <div class="track-name">${p.name}</div>
+        <div class="track-meta">${p.category} · ${p.duration} min</div>
+      </div>
+      <button class="track-action ${state.status === 'ready' ? 'ready' : ''} ${state.status === 'loading' ? 'busy' : ''}" data-id="${p.id}">
+        ${state.status === 'ready' ? '▶' : state.status === 'loading' ? '…' : '⬇️'}
+      </button>
+    `;
+    trackListEl.appendChild(row);
+  });
+
+  trackListEl.querySelectorAll('.track-action').forEach(btn => {
+    btn.addEventListener('click', () => onTrackActionClick(btn.dataset.id));
+  });
+}
+
+async function onTrackActionClick(id) {
+  const preset = PRESETS.find(p => p.id === id);
+  const state = library[id] || { status: 'none' };
+  if (state.status === 'ready') {
+    playTrack(id);
+    return;
+  }
+  if (state.status === 'loading') return;
+
+  library[id] = { status: 'loading' };
+  renderTracks();
+  try {
+    const audioBuffer = await renderOffline(preset.theme, preset.voices, preset.duration * 60);
+    const blob = encodeMp3(audioBuffer);
+    await saveTrackBlob(id, blob);
+    library[id] = { status: 'ready', blobUrl: URL.createObjectURL(blob) };
+    renderTracks();
+  } catch (err) {
+    console.error(err);
+    library[id] = { status: 'none' };
+    renderTracks();
+    alert('Erreur pendant la génération : ' + err.message);
+  }
+}
+
+// ===== Lecteur =====
+function playTrack(id) {
+  const preset = PRESETS.find(p => p.id === id);
+  const state = library[id];
+  if (!state || state.status !== 'ready') return;
+  currentTrackId = id;
+  audioEl.src = state.blobUrl;
+  audioEl.loop = loopOn;
+  audioEl.play();
+  playPauseBtn.textContent = '⏸';
+  playerTrackName.textContent = preset.name;
+  playerTrackMeta.textContent = `${preset.category} · ${preset.duration} min`;
+  playerEl.classList.add('show');
+  renderTracks();
+}
+
+playPauseBtn.addEventListener('click', () => {
+  if (!currentTrackId) return;
+  if (audioEl.paused) { audioEl.play(); playPauseBtn.textContent = '⏸'; }
+  else { audioEl.pause(); playPauseBtn.textContent = '▶'; }
+});
+
+function getReadyIds() {
+  return getFilteredSortedPresets().map(p => p.id).filter(id => library[id] && library[id].status === 'ready');
+}
+
+function playRelative(offset) {
+  const ready = getReadyIds();
+  if (ready.length === 0) return;
+  if (shuffleOn) {
+    let next = pick(ready);
+    if (ready.length > 1) while (next === currentTrackId) next = pick(ready);
+    playTrack(next);
+    return;
+  }
+  const idx = ready.indexOf(currentTrackId);
+  const nextIdx = ((idx === -1 ? 0 : idx + offset) + ready.length) % ready.length;
+  playTrack(ready[nextIdx]);
+}
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+prevBtn.addEventListener('click', () => playRelative(-1));
+nextBtn.addEventListener('click', () => playRelative(1));
+shuffleBtn.addEventListener('click', () => { shuffleOn = !shuffleOn; shuffleBtn.classList.toggle('toggled', shuffleOn); });
+loopBtn.addEventListener('click', () => { loopOn = !loopOn; audioEl.loop = loopOn; loopBtn.classList.toggle('toggled', loopOn); });
+audioEl.addEventListener('ended', () => { if (!loopOn) playRelative(1); });
+
+// ===== Moteur de génération (identique au prototype MP3 précédent) =====
+function randRange(min, max) { return min + Math.random() * (max - min); }
+function createNoiseBuffer(ctx, seconds) {
+  const bufferSize = Math.floor(ctx.sampleRate * seconds);
+  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  let lastOut = 0;
+  for (let i = 0; i < bufferSize; i++) {
+    const white = Math.random() * 2 - 1;
+    lastOut = (lastOut + 0.02 * white) / 1.02;
+    data[i] = lastOut * 3.2;
+  }
+  return buffer;
+}
+function createReverbImpulse(ctx, duration, decay) {
+  const rate = ctx.sampleRate;
+  const length = Math.floor(rate * duration);
+  const impulse = ctx.createBuffer(2, length, rate);
+  for (let ch = 0; ch < 2; ch++) {
+    const data = impulse.getChannelData(ch);
+    for (let i = 0; i < length; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
+  }
+  return impulse;
+}
+function buildScale(rootFreq) {
+  const ratios = [1, 9/8, 5/4, 3/2, 5/3, 2, 9/4, 5/2];
+  return ratios.map(r => rootFreq * r);
+}
+function buildTimeline(voices, duration) {
+  const events = [];
+  if (voices.includes('bells')) {
+    let t = randRange(0.5, 4);
+    while (t < duration) { events.push({ type: 'bell', time: t }); t += randRange(9, 26); }
+  }
+  if (voices.includes('drum')) {
+    let t = randRange(1, 5);
+    while (t < duration) {
+      events.push({ type: 'drum', time: t });
+      if (Math.random() < 0.4) events.push({ type: 'shaker', time: t + randRange(0.15, 0.35) });
+      t += randRange(3, 9);
+    }
+  }
+  if (voices.includes('nature')) {
+    let t = randRange(0.2, 1);
+    while (t < duration) { events.push({ type: 'droplet', time: t }); t += randRange(0.12, 0.9); }
+  }
+  if (voices.includes('flute')) {
+    let t = randRange(2, 8);
+    while (t < duration) {
+      const noteCount = Math.floor(randRange(2, 5));
+      for (let i = 0; i < noteCount; i++) {
+        const noteTime = t + i * randRange(1.4, 2.6);
+        if (noteTime < duration) events.push({ type: 'flute', time: noteTime });
+      }
+      t += noteCount * 2 + randRange(15, 40);
+    }
+  }
+  return events;
+}
+
+async function renderOffline(rootFreq, voices, duration) {
+  const sampleRate = 44100;
+  const ctx = new OfflineAudioContext(2, Math.floor(sampleRate * duration), sampleRate);
+  const scale = buildScale(rootFreq);
+
+  const masterGain = ctx.createGain(); masterGain.gain.value = 0;
+  const shaper = ctx.createWaveShaper();
+  const curve = new Float32Array(1024);
+  for (let i = 0; i < 1024; i++) { const x = (i / 1023) * 2 - 1; curve[i] = Math.tanh(x * 1.3); }
+  shaper.curve = curve;
+
+  const convolver = ctx.createConvolver();
+  convolver.buffer = createReverbImpulse(ctx, 3.5, 2.2);
+  const reverbSend = ctx.createGain(); reverbSend.gain.value = 0.35;
+  const dryGain = ctx.createGain(); dryGain.gain.value = 1;
+  const mixBus = ctx.createGain();
+
+  mixBus.connect(dryGain); mixBus.connect(reverbSend);
+  reverbSend.connect(convolver); convolver.connect(shaper); dryGain.connect(shaper);
+  shaper.connect(masterGain); masterGain.connect(ctx.destination);
+
+  masterGain.gain.setValueAtTime(0, 0);
+  masterGain.gain.linearRampToValueAtTime(0.9, Math.min(3, duration * 0.3));
+  masterGain.gain.setValueAtTime(0.9, Math.max(0, duration - 3));
+  masterGain.gain.linearRampToValueAtTime(0, duration);
+
+  const breathSpeed = 0.008 + Math.random() * 0.01;
+  const breathLfo = ctx.createOscillator(); breathLfo.frequency.value = breathSpeed;
+  const breathLfoGain = ctx.createGain(); breathLfoGain.gain.value = 0.12;
+  breathLfo.connect(breathLfoGain); breathLfoGain.connect(masterGain.gain);
+  breathLfo.start(0); breathLfo.stop(duration);
+
+  if (voices.includes('drone')) {
+    const bus = ctx.createGain(); bus.gain.value = 0.42; bus.connect(mixBus);
+    const detune = 1 + (Math.random() * 0.008 - 0.004);
+    const speeds = [0.015 + Math.random()*0.02, 0.02 + Math.random()*0.025, 0.008 + Math.random()*0.012];
+    function layer(freq, baseGain, lfoSpeed, lfoDepth) {
+      const osc = ctx.createOscillator(); osc.type = 'sine'; osc.frequency.value = freq;
+      const gain = ctx.createGain(); gain.gain.value = baseGain;
+      const lfo = ctx.createOscillator(); lfo.frequency.value = lfoSpeed;
+      const lfoGain = ctx.createGain(); lfoGain.gain.value = baseGain * lfoDepth;
+      lfo.connect(lfoGain); lfoGain.connect(gain.gain);
+      osc.connect(gain); gain.connect(bus);
+      osc.start(0); osc.stop(duration); lfo.start(0); lfo.stop(duration);
+    }
+    layer(rootFreq, 0.5, speeds[0], 0.4);
+    layer(rootFreq * detune, 0.35, speeds[1], 0.45);
+    layer(rootFreq * 2, 0.15, speeds[2], 0.6);
+  }
+
+  if (voices.includes('nature')) {
+    const windSource = ctx.createBufferSource();
+    windSource.buffer = createNoiseBuffer(ctx, Math.min(duration, 6)); windSource.loop = true;
+    const windFilter = ctx.createBiquadFilter(); windFilter.type = 'lowpass'; windFilter.frequency.value = 400; windFilter.Q.value = 0.6;
+    const windGain = ctx.createGain(); windGain.gain.value = 0.07;
+    windSource.connect(windFilter); windFilter.connect(windGain); windGain.connect(mixBus);
+    const windLfo = ctx.createOscillator(); windLfo.frequency.value = 0.015 + Math.random() * 0.015;
+    const windLfoGain = ctx.createGain(); windLfoGain.gain.value = 220;
+    windLfo.connect(windLfoGain); windLfoGain.connect(windFilter.frequency);
+    windSource.start(0); windSource.stop(duration); windLfo.start(0); windLfo.stop(duration);
+
+    const oceanSource = ctx.createBufferSource();
+    oceanSource.buffer = createNoiseBuffer(ctx, Math.min(duration, 8)); oceanSource.loop = true;
+    const oceanFilter = ctx.createBiquadFilter(); oceanFilter.type = 'lowpass'; oceanFilter.frequency.value = 180;
+    const oceanGain = ctx.createGain(); oceanGain.gain.value = 0.05;
+    oceanSource.connect(oceanFilter); oceanFilter.connect(oceanGain); oceanGain.connect(mixBus);
+    const oceanLfo = ctx.createOscillator(); oceanLfo.frequency.value = 0.05 + Math.random() * 0.04;
+    const oceanLfoGain = ctx.createGain(); oceanLfoGain.gain.value = 0.045;
+    oceanLfo.connect(oceanLfoGain); oceanLfoGain.connect(oceanGain.gain);
+    oceanSource.start(0); oceanSource.stop(duration); oceanLfo.start(0); oceanLfo.stop(duration);
+
+    const rainBed = ctx.createBufferSource();
+    rainBed.buffer = createNoiseBuffer(ctx, Math.min(duration, 5)); rainBed.loop = true;
+    const rainFilter = ctx.createBiquadFilter(); rainFilter.type = 'highpass'; rainFilter.frequency.value = 2500;
+    const rainGain = ctx.createGain(); rainGain.gain.value = 0.025;
+    rainBed.connect(rainFilter); rainFilter.connect(rainGain); rainGain.connect(mixBus);
+    rainBed.start(0); rainBed.stop(duration);
+  }
+
+  const timeline = buildTimeline(voices, duration);
+  timeline.forEach(ev => {
+    if (ev.type === 'bell') {
+      const freq = scale[Math.floor(Math.random()*scale.length)] * (Math.random() < 0.5 ? 1 : 2);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0, ev.time);
+      gain.gain.linearRampToValueAtTime(0.22, ev.time + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, ev.time + randRange(4, 9));
+      const panner = ctx.createStereoPanner(); panner.pan.value = randRange(-0.6, 0.6);
+      gain.connect(panner); panner.connect(mixBus);
+      [1, 2.01, 3.99].forEach((mult, idx) => {
+        const osc = ctx.createOscillator(); osc.type = 'sine'; osc.frequency.value = freq * mult;
+        const partialGain = ctx.createGain(); partialGain.gain.value = idx === 0 ? 1 : 0.25 / idx;
+        osc.connect(partialGain); partialGain.connect(gain);
+        osc.start(ev.time); osc.stop(Math.min(duration, ev.time + 10));
+      });
+    } else if (ev.type === 'drum') {
+      const osc = ctx.createOscillator(); osc.type = 'sine';
+      osc.frequency.setValueAtTime(120, ev.time);
+      osc.frequency.exponentialRampToValueAtTime(55, ev.time + 0.25);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.001, ev.time);
+      g.gain.linearRampToValueAtTime(0.28, ev.time + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.001, ev.time + 0.6);
+      osc.connect(g); g.connect(mixBus);
+      osc.start(ev.time); osc.stop(Math.min(duration, ev.time + 0.7));
+    } else if (ev.type === 'shaker') {
+      const noiseSrc = ctx.createBufferSource(); noiseSrc.buffer = createNoiseBuffer(ctx, 1);
+      const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 4000;
+      const g2 = ctx.createGain();
+      g2.gain.setValueAtTime(0.06, ev.time);
+      g2.gain.exponentialRampToValueAtTime(0.0005, ev.time + 0.12);
+      noiseSrc.connect(hp); hp.connect(g2); g2.connect(mixBus);
+      noiseSrc.start(ev.time); noiseSrc.stop(Math.min(duration, ev.time + 0.15));
+    } else if (ev.type === 'droplet') {
+      const osc = ctx.createOscillator(); osc.type = 'sine'; osc.frequency.value = randRange(1200, 3200);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.015, ev.time);
+      g.gain.exponentialRampToValueAtTime(0.0005, ev.time + 0.15);
+      osc.connect(g); g.connect(mixBus);
+      osc.start(ev.time); osc.stop(Math.min(duration, ev.time + 0.2));
+    } else if (ev.type === 'flute') {
+      const freq = scale[Math.floor(Math.random()*scale.length)];
+      const osc = ctx.createOscillator(); osc.type = 'sine'; osc.frequency.value = freq;
+      const vibrato = ctx.createOscillator(); vibrato.frequency.value = 4.5;
+      const vibratoGain = ctx.createGain(); vibratoGain.gain.value = freq * 0.006;
+      vibrato.connect(vibratoGain); vibratoGain.connect(osc.frequency);
+      const g = ctx.createGain(); const dur = randRange(1.2, 2.6);
+      g.gain.setValueAtTime(0, ev.time);
+      g.gain.linearRampToValueAtTime(0.16, ev.time + 0.25);
+      g.gain.linearRampToValueAtTime(0, Math.min(duration, ev.time + dur));
+      osc.connect(g); g.connect(mixBus);
+      const stopTime = Math.min(duration, ev.time + dur + 0.1);
+      osc.start(ev.time); osc.stop(stopTime); vibrato.start(ev.time); vibrato.stop(stopTime);
+    }
+  });
+
+  return await ctx.startRendering();
+}
+
+function floatTo16BitPCM(input) {
+  const output = new Int16Array(input.length);
+  for (let i = 0; i < input.length; i++) {
+    const s = Math.max(-1, Math.min(1, input[i]));
+    output[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+  }
+  return output;
+}
+function encodeMp3(audioBuffer) {
+  const sampleRate = audioBuffer.sampleRate;
+  const left = floatTo16BitPCM(audioBuffer.getChannelData(0));
+  const right = audioBuffer.numberOfChannels > 1 ? floatTo16BitPCM(audioBuffer.getChannelData(1)) : left;
+  const mp3encoder = new lamejs.Mp3Encoder(2, sampleRate, 128);
+  const blockSize = 1152;
+  const mp3Data = [];
+  for (let i = 0; i < left.length; i += blockSize) {
+    const leftChunk = left.subarray(i, i + blockSize);
+    const rightChunk = right.subarray(i, i + blockSize);
+    const buf = mp3encoder.encodeBuffer(leftChunk, rightChunk);
+    if (buf.length > 0) mp3Data.push(buf);
+  }
+  const endBuf = mp3encoder.flush();
+  if (endBuf.length > 0) mp3Data.push(endBuf);
+  return new Blob(mp3Data, { type: 'audio/mp3' });
+}
+
+// ===== Démarrage =====
+renderTracks();
+loadExistingLibrary();
+</script>
+
+</body>
+</html>
